@@ -2,7 +2,7 @@ import { PATH_SEGMENTS } from "./constants.js";
 import { PathImpl, setTemplatePathCtor } from "./impl/path-impl.js";
 import { TemplatePathImpl } from "./impl/template-path-impl.js";
 import type { BasePath, Path, PathExpression, Segment } from "./types.js";
-import { createPathProxy } from "./utils.js";
+import { createPathProxy, isCanonicalArrayIndex } from "./utils.js";
 
 setTemplatePathCtor(TemplatePathImpl);
 
@@ -86,7 +86,9 @@ export function unsafePath<T>(raw: string): Path<T, unknown, string> {
 	const segments: Segment[] = raw
 		? raw
 				.split(".")
-				.map((s) => (s === "" ? s : Number.isNaN(Number(s)) ? s : Number(s)))
+				.map((s) =>
+					s === "" ? s : isCanonicalArrayIndex(s) ? Number(s) : s,
+				)
 		: [];
 	return new PathImpl<T, unknown, string>(segments);
 }

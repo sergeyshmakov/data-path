@@ -26,6 +26,13 @@ describe("unsafePath()", () => {
 			expect(p.segments).toEqual(["items", 0]);
 		});
 
+		it("preserves numeric-looking object keys as strings", () => {
+			const p = unsafePath<object>("data.01");
+			expect(p.segments).toEqual(["data", "01"]);
+			const p2 = unsafePath<object>("a.1e3.b");
+			expect(p2.segments).toEqual(["a", "1e3", "b"]);
+		});
+
 		it("handles malformed strings with best-effort parse", () => {
 			const p = unsafePath<object>("a..b");
 			expect(p.segments).toContain("");
