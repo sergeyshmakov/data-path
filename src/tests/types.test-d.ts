@@ -62,6 +62,15 @@ describe("Type checks", () => {
 		>();
 	});
 
+	it("path.each().to(p => p.x) returns Path with same structure as path.each(p => p.x)", () => {
+		const viaTo = path((p: { items: Array<{ name: string }> }) => p.items)
+			.each()
+			.to((i) => i.name);
+		expectTypeOf(viaTo).toEqualTypeOf<
+			Path<{ items: Array<{ name: string }> }, string, string>
+		>();
+	});
+
 	it(".deep() returns TemplatePath", () => {
 		const deep = path((p: { tree: { label: string } }) => p.tree).deep(
 			(n: { label: string }) => n.label,

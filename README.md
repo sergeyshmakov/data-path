@@ -5,7 +5,7 @@ A simple, modern, zero-dependency, and fully type-safe library for building, com
 [![npm version](https://badge.fury.io/js/data-path.svg)](https://badge.fury.io/js/data-path)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
 
-## The Problem
+## ⚠️ The Problem
 
 When working with deep object structures, forms, or nested state, we often rely on string-based paths (e.g., `"users.0.name"` or `"company.departments[1].budget"`). This approach is fundamentally flawed in modern TypeScript development:
 
@@ -14,7 +14,7 @@ When working with deep object structures, forms, or nested state, we often rely 
 - **No Autocomplete:** Your IDE cannot guide you through the object structure.
 - **No Mathematics:** It is difficult to programmatically determine if path `A` is a child of path `B`, or if they overlap.
 
-## The Solution
+## 🚀 The Solution
 
 `data-path` solves this by using **Proxy-based lambda expressions** to capture paths. It gives you 100% type safety, IDE autocomplete, and a rich API for interacting with data and other paths.
 
@@ -49,7 +49,7 @@ const updatedUser = firstNamePath.set(user, "Bob");
 console.log(updatedUser.profile.firstName); // "Bob"
 ```
 
-## Installation
+## 📦 Installation
 
 ```bash
 npm install data-path
@@ -57,14 +57,59 @@ npm install data-path
 
 _(or use `yarn add data-path`, `pnpm add data-path`, `bun add data-path`)_
 
-## Philosophy
+## 🤖 AI Ready
+
+This package is available in [Context7](https://context7.com/) MCP, so AI assistants can load it directly into context when working with your object property paths.
+
+It also ships an [Agent Skills](https://agentskills.io/) – compatible skill. Install it so your AI assistant loads data-path guidance:
+
+```bash
+npx ctx7 skills install /sergeyshmakov/data-path data-path
+```
+
+The skill lives in `skills/data-path/SKILL.md`.
+
+## 💡 Philosophy
 
 - **Stack Agnostic:** Pure data manipulation. Works perfectly with React, Vue, Node.js, or vanilla JavaScript.
 - **Zero Dependencies:** A tiny, efficient footprint that doesn't bloat your bundle.
 - **Fully Type-Safe:** Built strictly for TypeScript. If the structure changes, the compiler will instantly catch broken paths.
 - **Immutable:** All `.set()` operations return structurally cloned objects, making it the perfect companion for modern state managers (Redux, Zustand) and reactive frameworks.
 
-## Core API
+## 📚 Core API
+
+### 🏷️ API Cheatsheet
+
+| API | Description |
+|-----|-------------|
+| **Creation** | |
+| `path<T>()` | Create root path |
+| `path<T>(p => p.a.b)` | Create path from lambda |
+| `path(base, p => p.c)` | Extend existing path |
+| `unsafePath<T>("a.b")` | Create path from raw string |
+| **Properties** | |
+| `path.$` | String representation (e.g. `"users.0.name"`) |
+| `path.segments` | Array of segments |
+| `path.length` | Number of segments |
+| `path.fn` | Accessor function for `.map()`, `.filter()` |
+| **Data Access** | |
+| `path.get(data)` | Read value at path (returns `undefined` if missing) |
+| `path.set(data, value)` | Immutable write, returns new object |
+| **Traversal** | |
+| `path.to(p => p.x)` | Extend path from current value |
+| `path.each(p => p.x)` | Template: match all items in collection |
+| `path.deep(node => node.id)` | Template: match property at any depth |
+| **Manipulation** | |
+| `path.merge(other)` | Append path (deduplicates overlap) |
+| `path.subtract(other)` | Remove prefix/suffix, or `null` |
+| `path.slice(start?, end?)` | Slice segments (like `Array.prototype.slice`) |
+| **Relational** | |
+| `path.startsWith(other)` | True if path is prefix |
+| `path.includes(other)` | True if path contains other |
+| `path.equals(other)` | True if paths are identical |
+| `path.match(other)` | Returns `{ relation, params }` or `null` |
+| **Template-only** | |
+| `templatePath.expand(data)` | Resolve template to concrete paths |
 
 ### Path Creation
 
@@ -201,7 +246,7 @@ namePath.match(profilePath); // { relation: 'child', params: {} }
 profilePath.match(namePath); // { relation: 'parent', params: {} }
 ```
 
-## Real-World Examples
+## 💼 Real-World Examples
 
 ### 1. React Hook Form
 
@@ -368,10 +413,10 @@ const columns = [
 ];
 ```
 
-## Contributing
+## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for more details.
 
-## License
+## 📄 License
 
 This project is licensed under the [ISC License](LICENSE).
