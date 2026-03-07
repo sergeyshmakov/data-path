@@ -1,4 +1,4 @@
-# Contributing to `playwright-page-object`
+# Contributing to `data-path`
 
 First off, thank you for being here! 🎉 
 
