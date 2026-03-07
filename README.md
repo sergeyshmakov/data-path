@@ -67,7 +67,7 @@ It also ships an [Agent Skills](https://agentskills.io/) – compatible skill. I
 npx ctx7 skills install /sergeyshmakov/data-path data-path
 ```
 
-The skill lives in `skills/data-path/SKILL.md`.
+The skill lives in [skills/data-path/SKILL.md](skills/data-path/SKILL.md).
 
 ## 💡 Philosophy
 
