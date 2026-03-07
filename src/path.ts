@@ -86,9 +86,7 @@ export function unsafePath<T>(raw: string): Path<T, unknown, string> {
 	const segments: Segment[] = raw
 		? raw
 				.split(".")
-				.map((s) =>
-					s === "" ? s : isCanonicalArrayIndex(s) ? Number(s) : s,
-				)
+				.map((s) => (s === "" ? s : isCanonicalArrayIndex(s) ? Number(s) : s))
 		: [];
 	return new PathImpl<T, unknown, string>(segments);
 }
