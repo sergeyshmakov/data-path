@@ -49,7 +49,9 @@ describe("Path algebra", () => {
 		});
 
 		it("with ambiguous overlaps uses longest match", () => {
-			const a = path((p: { list: { items: { list: string } } }) => p.list.items.list);
+			const a = path(
+				(p: { list: { items: { list: string } } }) => p.list.items.list,
+			);
 			const b = path((p: { list: { count: number } }) => p.list.count);
 			const merged = a.merge(b);
 			expect(merged.segments).toEqual(["list", "items", "list", "count"]);
@@ -57,15 +59,30 @@ describe("Path algebra", () => {
 
 		it("correctly handles overlaps with numeric runtime indices", () => {
 			const i = 3;
-			const root = path<{ products: Array<{ list: string }> }>((p) => p.products[i].list);
-			const tail = path<{ list: { items: Array<{ name: string }> } }>((p) => p.list.items[0].name);
+			const root = path<{ products: Array<{ list: string }> }>(
+				(p) => p.products[i].list,
+			);
+			const tail = path<{ list: { items: Array<{ name: string }> } }>(
+				(p) => p.list.items[0].name,
+			);
 			const merged = root.merge(tail);
-			expect(merged.segments).toEqual(["products", 3, "list", "items", 0, "name"]);
+			expect(merged.segments).toEqual([
+				"products",
+				3,
+				"list",
+				"items",
+				0,
+				"name",
+			]);
 		});
 
 		it("with a prefix returns the longer path unchanged", () => {
-			const a = path((p: { user: { address: { city: string } } }) => p.user.address);
-			const b = path((p: { user: { address: { city: string } } }) => p.user.address.city);
+			const a = path(
+				(p: { user: { address: { city: string } } }) => p.user.address,
+			);
+			const b = path(
+				(p: { user: { address: { city: string } } }) => p.user.address.city,
+			);
 			const merged = a.merge(b);
 			expect(merged.segments).toEqual(["user", "address", "city"]);
 		});
@@ -195,7 +212,7 @@ describe("Path algebra", () => {
 		it("allows .merge() with completely incompatible base at compile time due to structural typing", () => {
 			const head = path((p: { a: number }) => p.a);
 			const tail = path((p: { b: string }) => p.b);
-			
+
 			// No ts-expect-error because BasePath structurally matches { segments: Segment[] }
 			head.merge(tail);
 		});

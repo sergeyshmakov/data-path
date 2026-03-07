@@ -37,6 +37,7 @@ describe("path()", () => {
 		});
 
 		it("conditional branching inside lambdas silently records only the truthy branch", () => {
+			// biome-ignore lint/style/noNonNullAssertion: intentional - falsy branch is ignored by path extraction, assertion satisfies type checker
 			const p = path((x: { a: { b: string; c: string } | null }) =>
 				x.a ? x.a.b : x.a!.c,
 			);
@@ -63,27 +64,27 @@ describe("path()", () => {
 
 		it("immutability: path composition does not mutate the base path object", () => {
 			const base = path((x: User) => x.items);
-			const full = path(base, (p) => p[0].name);
+			const _full = path(base, (p) => p[0].name);
 			expect(base.segments).toEqual(["items"]);
 		});
 	});
 
 	describe("unexpected cases", () => {
 		it("safely yields empty path when lambda returns literal", () => {
-			const p = path((x: User) => "hello");
+			const p = path((_x: User) => "hello");
 			expect(p.segments).toEqual([]);
 		});
 
 		it("safely yields empty path when lambda returns null or undefined", () => {
-			const p1 = path((x: User) => null);
+			const p1 = path((_x: User) => null);
 			expect(p1.segments).toEqual([]);
-			const p2 = path((x: User) => undefined);
+			const p2 = path((_x: User) => undefined);
 			expect(p2.segments).toEqual([]);
 		});
 
 		it("yields empty path for side effects only", () => {
-			const p = path((x: User) => {
-				const a = 1 + 1;
+			const p = path((_x: User) => {
+				const _a = 1 + 1;
 			});
 			expect(p.segments).toEqual([]);
 		});
@@ -94,7 +95,7 @@ describe("path()", () => {
 			const p = path((x: User) => x.address.city);
 			const users: User[] = [
 				{ items: [], address: { city: "New York" } },
-				{ items: [], address: { city: "London" } }
+				{ items: [], address: { city: "London" } },
 			];
 			const cities = users.map(p.fn);
 			expect(cities).toEqual(["New York", "London"]);

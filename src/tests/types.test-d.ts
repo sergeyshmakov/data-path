@@ -5,7 +5,7 @@
  */
 /// <reference types="vitest/globals" />
 
-import { expectTypeOf, assertType } from "vitest";
+import { assertType, expectTypeOf } from "vitest";
 import type { Path, TemplatePath } from "../index.js";
 import { path, unsafePath } from "../index.js";
 
@@ -43,9 +43,13 @@ describe("Type checks", () => {
 	});
 
 	it(".fn has correct signature for template paths", () => {
-		const p = path((x: { items: Array<{ name: string }> }) => x.items).each(i => i.name);
+		const p = path((x: { items: Array<{ name: string }> }) => x.items).each(
+			(i) => i.name,
+		);
 		expectTypeOf(p.fn).toBeFunction();
-		expectTypeOf(p.fn).parameters.toEqualTypeOf<[{ items: Array<{ name: string }> }]>();
+		expectTypeOf(p.fn).parameters.toEqualTypeOf<
+			[{ items: Array<{ name: string }> }]
+		>();
 		expectTypeOf(p.fn).returns.toEqualTypeOf<string[]>();
 	});
 
@@ -92,19 +96,27 @@ describe("Type checks", () => {
 		it(".to() appends relative path", () => {
 			const root = path((x: { a: { b: string } }) => x.a);
 			const full = root.to((a) => a.b);
-			expectTypeOf(full).toEqualTypeOf<Path<{ a: { b: string } }, string, string>>();
+			expectTypeOf(full).toEqualTypeOf<
+				Path<{ a: { b: string } }, string, string>
+			>();
 		});
 
 		it(".merge() accepts lambda expressions", () => {
 			const root = path((x: { a: { b: string } }) => x.a);
 			const merged = root.merge((x) => x.a.b);
-			expectTypeOf(merged).toEqualTypeOf<Path<{ a: { b: string } }, string, string>>();
+			expectTypeOf(merged).toEqualTypeOf<
+				Path<{ a: { b: string } }, string, string>
+			>();
 		});
 
 		it(".subtract() accepts lambda expressions", () => {
 			const full = path((x: { a: { b: string } }) => x.a.b);
 			const subtracted = full.subtract((x) => x.a);
-			expectTypeOf(subtracted).toEqualTypeOf<Path<{ a: { b: string } }, string, string> | null>();
+			expectTypeOf(subtracted).toEqualTypeOf<Path<
+				{ a: { b: string } },
+				string,
+				string
+			> | null>();
 		});
 
 		it("primitives do not expose .each or .deep", () => {
@@ -120,7 +132,7 @@ describe("Type checks", () => {
 describe("Generic Type Preservation", () => {
 	// Wrapper function to provide a generic context
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	function testGenerics<T>() {
+	function _testGenerics<T>() {
 		type Wrapper<U> = { value: U; items: U[]; tree: { node: U } };
 
 		it("preserves T in path creation", () => {
@@ -183,15 +195,15 @@ describe("Typing incorrect cases", () => {
 	it("rejects operations between paths with strictly incompatible root types", () => {
 		type User = { items: Array<{ name: string }> };
 		type Product = { items: Array<{ price: number }> };
-		
-		const a = path((p: User) => p.items).each(i => i.name);
-		const b = path((p: Product) => p.items).each(i => i.price);
-		
+
+		const a = path((p: User) => p.items).each((i) => i.name);
+		const b = path((p: Product) => p.items).each((i) => i.price);
+
 		// Expected error because User and Product are structurally incompatible,
 		// and ResolvablePath expects root type <T>
 		// TS actually allows it because BasePath's structural typing matches methods,
 		// but we verify that the params object types are strongly typed.
-		
+
 		a.match(b);
 		a.merge(b);
 	});

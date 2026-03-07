@@ -65,7 +65,10 @@ describe("Template paths", () => {
 			const tmpl = path((p: User) => p.items).each(
 				(i: { name: string }) => i.name,
 			);
-			const data: User = { items: [{ name: "A" }, { name: "B" }], name: "root" };
+			const data: User = {
+				items: [{ name: "A" }, { name: "B" }],
+				name: "root",
+			};
 			const paths = tmpl.expand(data);
 			expect(paths).toHaveLength(2);
 			expect(paths[0].$).toBe("items.0.name");
@@ -84,7 +87,10 @@ describe("Template paths", () => {
 			const tmpl = path((p: User) => p.items).each(
 				(i: { name: string }) => i.name,
 			);
-			const data: User = { items: [{ name: "A" }, { name: "B" }], name: "root" };
+			const data: User = {
+				items: [{ name: "A" }, { name: "B" }],
+				name: "root",
+			};
 			tmpl.expand(data);
 			expect(tmpl.segments).toEqual(["items", "*", "name"]);
 		});
@@ -93,12 +99,14 @@ describe("Template paths", () => {
 			interface AppData {
 				items: Array<{ settings: Array<{ value: number }> }>;
 			}
-			const tmpl = path((p: AppData) => p.items).each(i => i.settings).each(s => s.value);
+			const tmpl = path((p: AppData) => p.items)
+				.each((i) => i.settings)
+				.each((s) => s.value);
 			const data: AppData = {
 				items: [
 					{ settings: [{ value: 1 }, { value: 2 }] },
-					{ settings: [{ value: 3 }] }
-				]
+					{ settings: [{ value: 3 }] },
+				],
 			};
 			const paths = tmpl.expand(data);
 			expect(paths).toHaveLength(3);
@@ -111,12 +119,14 @@ describe("Template paths", () => {
 			interface MixedData {
 				items: Array<{ tree: { label: string; children?: any[] } }>;
 			}
-			const tmpl = path((p: MixedData) => p.items).each(i => i.tree).deep(n => n.label);
+			const tmpl = path((p: MixedData) => p.items)
+				.each((i) => i.tree)
+				.deep((n) => n.label);
 			const data: MixedData = {
 				items: [
 					{ tree: { label: "root1", children: [{ label: "child1" }] } },
-					{ tree: { label: "root2" } }
-				]
+					{ tree: { label: "root2" } },
+				],
 			};
 			const paths = tmpl.expand(data);
 			expect(paths).toHaveLength(3);
@@ -143,11 +153,11 @@ describe("Template paths", () => {
 
 	describe(".fn accessor", () => {
 		it("returns a function that extracts an array of values", () => {
-			const tmpl = path((p: User) => p.items).each(i => i.name);
+			const tmpl = path((p: User) => p.items).each((i) => i.name);
 			const users: User[] = [
 				{ items: [{ name: "A" }, { name: "B" }], name: "root1" },
 				{ items: [{ name: "C" }], name: "root2" },
-				{ items: [], name: "root3" }
+				{ items: [], name: "root3" },
 			];
 			const allItems = users.map(tmpl.fn);
 			expect(allItems).toEqual([["A", "B"], ["C"], []]);
@@ -166,15 +176,21 @@ describe("Template paths", () => {
 
 	describe("bulk data access", () => {
 		it(".get() returns array of all collected values", () => {
-			const tmpl = path((p: User) => p.items).each(i => i.name);
-			const data: User = { items: [{ name: "A" }, { name: "B" }], name: "root" };
+			const tmpl = path((p: User) => p.items).each((i) => i.name);
+			const data: User = {
+				items: [{ name: "A" }, { name: "B" }],
+				name: "root",
+			};
 			const values = tmpl.get(data);
 			expect(values).toEqual(["A", "B"]);
 		});
 
 		it(".set() immutably updates all matching paths", () => {
-			const tmpl = path((p: User) => p.items).each(i => i.name);
-			const data: User = { items: [{ name: "A" }, { name: "B" }], name: "root" };
+			const tmpl = path((p: User) => p.items).each((i) => i.name);
+			const data: User = {
+				items: [{ name: "A" }, { name: "B" }],
+				name: "root",
+			};
 			const updated = tmpl.set(data, "Updated");
 			expect(updated).not.toBe(data);
 			expect(updated.items[0]).not.toBe(data.items[0]);

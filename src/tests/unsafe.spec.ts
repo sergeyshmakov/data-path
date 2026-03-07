@@ -47,13 +47,13 @@ describe("unsafePath()", () => {
 		it("handles extremely malformed strings", () => {
 			const p1 = unsafePath<object>("...");
 			expect(p1.segments).toEqual(["", "", "", ""]);
-			
+
 			const p2 = unsafePath<object>("a.foo bar.b");
 			expect(p2.segments).toEqual(["a", "foo bar", "b"]);
-			
+
 			const p3 = unsafePath<object>("a.b.");
 			expect(p3.segments).toEqual(["a", "b", ""]);
-			
+
 			const p4 = unsafePath<object>("!@#.$%^");
 			expect(p4.segments).toEqual(["!@#", "$%^"]);
 		});
@@ -65,7 +65,7 @@ describe("unsafePath()", () => {
 				// @ts-expect-error
 				unsafePath(123);
 			}).toThrow();
-			
+
 			expect(() => {
 				// @ts-expect-error
 				unsafePath({ path: "a.b" });

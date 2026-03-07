@@ -92,7 +92,9 @@ describe("Path interactions", () => {
 
 		it("returns null when comparing two different templates", () => {
 			const a = path((p: R) => p.items).each((i: { name: string }) => i.name);
-			const b = path((p: { items: Array<{ price: number }> }) => p.items).each((i) => i.price);
+			const b = path((p: { items: Array<{ price: number }> }) => p.items).each(
+				(i) => i.price,
+			);
 			expect(a.match(b)).toBeNull();
 		});
 
@@ -110,7 +112,7 @@ describe("Path interactions", () => {
 		it("returns false/null for completely disjoint paths", () => {
 			const a = path((p: R) => p.items[0].name);
 			const b = path((p: { other: string }) => p.other);
-			
+
 			expect(a.startsWith(b as any)).toBe(false);
 			expect(a.includes(b as any)).toBe(false);
 			expect(a.equals(b as any)).toBe(false);
@@ -132,10 +134,10 @@ describe("Path interactions", () => {
 		it("allows comparisons with incompatible root types at compile time due to structural typing", () => {
 			const a = path((p: R) => p.items);
 			const b = path((p: { different: string }) => p.different);
-			
+
 			// No ts-expect-error because BasePath structurally matches { segments: Segment[] }
 			a.match(b);
-			
+
 			a.merge(b);
 		});
 	});

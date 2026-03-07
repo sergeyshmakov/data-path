@@ -1,7 +1,9 @@
-import type { Segment, ResolvablePath } from "./types.js";
-import { PATH_SEGMENTS, WILDCARD, DEEP_WILDCARD } from "./constants.js";
+import { DEEP_WILDCARD, PATH_SEGMENTS, WILDCARD } from "./constants.js";
+import type { ResolvablePath, Segment } from "./types.js";
 
-export function resolveSegments(target: ResolvablePath<any>): readonly Segment[] {
+export function resolveSegments(
+	target: ResolvablePath<any>,
+): readonly Segment[] {
 	if (typeof target === "function") {
 		const proxy = createPathProxy([]);
 		const result = target(proxy) as any;
@@ -18,18 +20,22 @@ export function createPathProxy(segments: readonly Segment[]): any {
 		{ [PATH_SEGMENTS]: segments },
 		{
 			get(target, key) {
-				if (key === PATH_SEGMENTS) return target[PATH_SEGMENTS as keyof typeof target];
+				if (key === PATH_SEGMENTS)
+					return target[PATH_SEGMENTS as keyof typeof target];
 				if (typeof key === "string" && key !== "then" && key !== "Symbol") {
 					const next: Segment = Number.isNaN(Number(key)) ? key : Number(key);
 					return createPathProxy([...segments, next]);
 				}
 				return typeof key === "symbol" ? undefined : createPathProxy(segments);
 			},
-		}
+		},
 	);
 }
 
-export function segmentsEqual(a: readonly Segment[], b: readonly Segment[]): boolean {
+export function segmentsEqual(
+	a: readonly Segment[],
+	b: readonly Segment[],
+): boolean {
 	if (a.length !== b.length) return false;
 	return a.every((s, i) => s === b[i]);
 }
@@ -63,7 +69,11 @@ export function patternMatches(
 ): boolean {
 	if (pattern.length !== concrete.length) return false;
 	for (let i = 0; i < pattern.length; i++) {
-		if (pattern[i] !== WILDCARD && pattern[i] !== DEEP_WILDCARD && pattern[i] !== concrete[i])
+		if (
+			pattern[i] !== WILDCARD &&
+			pattern[i] !== DEEP_WILDCARD &&
+			pattern[i] !== concrete[i]
+		)
 			return false;
 	}
 	return true;

@@ -71,9 +71,7 @@ describe("Data access", () => {
 					},
 					{
 						id: "p2",
-						photos: [
-							{ id: "ph2_1", url: "url2_1" },
-						],
+						photos: [{ id: "ph2_1", url: "url2_1" }],
 					},
 				],
 			});
@@ -81,9 +79,9 @@ describe("Data access", () => {
 			it("creates new references only along the updated path", () => {
 				const data = getFixture();
 				const p = path((x: Shop) => x.products[0].photos[1].url);
-				
+
 				const updated = p.set(data, "new_url");
-				
+
 				// Value is updated
 				expect(updated.products[0].photos[1].url).toBe("new_url");
 				// Original is unchanged
@@ -98,13 +96,15 @@ describe("Data access", () => {
 				// Inner array reference changed
 				expect(updated.products[0].photos).not.toBe(data.products[0].photos);
 				// Inner object reference changed
-				expect(updated.products[0].photos[1]).not.toBe(data.products[0].photos[1]);
+				expect(updated.products[0].photos[1]).not.toBe(
+					data.products[0].photos[1],
+				);
 			});
 
 			it("preserves original references for unchanged branches (structural sharing)", () => {
 				const data = getFixture();
 				const p = path((x: Shop) => x.products[0].photos[1].url);
-				
+
 				const updated = p.set(data, "new_url");
 
 				// Unchanged sibling in the products array is reused
@@ -128,8 +128,8 @@ describe("Data access", () => {
 			const p = path((x: { a: { b: number } }) => x.a.b);
 			// Trying to traverse into a string
 			expect(p.get({ a: "string" } as any)).toBeUndefined();
-			
-			// Trying to set into a string replaces the string with an object/array at that level? 
+
+			// Trying to set into a string replaces the string with an object/array at that level?
 			// Or at least it doesn't crash the host program unexpectedly.
 			expect(() => p.set({ a: "string" } as any, 42)).not.toThrow();
 		});
@@ -140,7 +140,7 @@ describe("Data access", () => {
 			const result = p.set(data, "f");
 			expect(result.items[5]).toBe("f");
 			expect(result.items.length).toBeGreaterThan(1);
-			
+
 			// Negative index behavior checks
 			const pNeg = path((x: { items: string[] }) => x.items[-1]);
 			expect(() => pNeg.set(data, "z")).not.toThrow();
