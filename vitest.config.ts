@@ -4,8 +4,8 @@ export default defineConfig({
 	test: {
 		include: ["src/tests/**/*.spec.ts"],
 		globals: true,
-	},
-	typecheck: {
-		include: ["src/tests/**/*.test-d.ts"],
+		typecheck: {
+			include: ["src/tests/**/*.test-d.ts"],
+		},
 	},
 });
