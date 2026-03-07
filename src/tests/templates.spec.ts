@@ -32,7 +32,9 @@ describe("Template paths", () => {
 		});
 
 		it("path.each().to(p => p.x) produces same path string as path.each(p => p.x)", () => {
-			const viaTo = path((p: User) => p.items).each().to((i) => i.name);
+			const viaTo = path((p: User) => p.items)
+				.each()
+				.to((i) => i.name);
 			const viaEach = path((p: User) => p.items).each((i) => i.name);
 			expect(viaTo.$).toBe("items.*.name");
 			expect(viaTo.segments).toEqual(["items", "*", "name"]);
