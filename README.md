@@ -84,7 +84,8 @@ The skill lives in `skills/data-path/SKILL.md`.
 |-----|-------------|
 | **Creation** | |
 | `path<T>()` | Create root path |
-| `path<T>(p => p.a.b)` | Create path from lambda |
+| `path<T>(p => p.a.b)` | Create path from lambda, generic type |
+| `path((p: T) => p.a.b)` | Create path from lambda, infer type |
 | `path(base, p => p.c)` | Extend existing path |
 | `unsafePath<T>("a.b")` | Create path from raw string |
 | **Properties** | |
@@ -98,6 +99,7 @@ The skill lives in `skills/data-path/SKILL.md`.
 | **Traversal** | |
 | `path.to(p => p.x)` | Extend path from current value |
 | `path.each(p => p.x)` | Template: match all items in collection |
+| `path.each().to(p => p.x)` | Same as above |
 | `path.deep(node => node.id)` | Template: match property at any depth |
 | **Manipulation** | |
 | `path.merge(other)` | Append path (deduplicates overlap) |
@@ -122,6 +124,9 @@ const profile = root.to(p => p.profile);
 
 // Direct lambda
 const tagsPath = path<User>(p => p.tags[0]);
+
+// Infer type from argument (often preferred)
+const lastNamePath = path((user: User) => user.profile.lastName);
 
 // From raw string (dynamic contexts)
 import { unsafePath } from "data-path";
@@ -244,6 +249,23 @@ namePath.equals(namePath); // true
 // returns 'includes', 'included-by', 'equals', 'parent', 'child', or null
 namePath.match(profilePath); // { relation: 'child', params: {} }
 profilePath.match(namePath); // { relation: 'parent', params: {} }
+```
+
+### Utility Types
+
+The library exports several TypeScript types that are useful when writing helper functions or React components that accept paths as props:
+
+```typescript
+import type { Path, TemplatePath, ResolvedType } from "data-path";
+
+// 1. Accept a specific path structure
+function NameInput({ fieldPath }: { fieldPath: Path<User, string> }) {
+    return <input name={fieldPath.$} />;
+}
+
+// 2. Extract the resolved value type from an existing path
+const agePath = path<User>(p => p.profile.age);
+type Age = ResolvedType<typeof agePath>; // number
 ```
 
 ## 💼 Real-World Examples
