@@ -61,6 +61,8 @@ _(or use `yarn add data-path`, `pnpm add data-path`, `bun add data-path`)_
 
 This package is available in [Context7](https://context7.com/) MCP, so AI assistants can load it directly into context when working with your object property paths.
 
+A [Cubic wiki](https://www.cubic.dev/wikis/sergeyshmakov/data-path) provides AI-ready documentation for this project.
+
 It also ships an [Agent Skills](https://agentskills.io/) – compatible skill. Install it so your AI assistant loads data-path guidance:
 
 ```bash
