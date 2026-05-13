@@ -58,6 +58,9 @@
 		"url": "https://github.com/sergeyshmakov/data-path/issues"
 	},
 	"homepage": "https://sergeyshmakov.github.io/data-path/",
+	"lint-staged": {
+		"*.{js,jsx,ts,tsx,json,jsonc,md,mdx,css,yml,yaml}": "biome check --write --no-errors-on-unmatched"
+	},
 	"release": {
 		"branches": [
 			"main"
@@ -93,6 +96,7 @@
 		"@semantic-release/changelog": "^6.0.3",
 		"@semantic-release/git": "^10.0.1",
 		"husky": "^9.1.7",
+		"lint-staged": "^17.0.4",
 		"semantic-release": "^25.0.3",
 		"tsup": "^8.5.1",
 		"typescript": "^5.9.3",
