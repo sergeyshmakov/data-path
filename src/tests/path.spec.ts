@@ -53,13 +53,14 @@ describe("path()", () => {
 			expect(full.$).toBe("items.0.name");
 		});
 
-		it("composition of unsafe paths concatenates their segments", () => {
-			const a = unsafePath<User>("address.street");
-			const b = unsafePath<User>("city");
-			// @ts-expect-error - Testing runtime concatenation of two Path objects
-			const composed = path(a, b);
-			expect(composed.segments).toEqual(["address", "street", "city"]);
-			expect(composed.$).toBe("address.street.city");
+		it("composition with a pre-built path object uses .to()", () => {
+			// path(base, expr) requires expr to be a lambda; to compose two path
+			// objects use base.to(other) which accepts any ResolvablePath<V, U>.
+			const a = unsafePath<User>("address");
+			const b = unsafePath<{ city: string }>("city");
+			const composed = a.to(b);
+			expect(composed.segments).toEqual(["address", "city"]);
+			expect(composed.$).toBe("address.city");
 		});
 
 		it("immutability: path composition does not mutate the base path object", () => {

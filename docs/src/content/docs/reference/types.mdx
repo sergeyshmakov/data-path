@@ -18,6 +18,16 @@ function register<T>(fieldPath: Path<T, string>, value: string) {
 
 `Path<T, V>` conditionally includes `.each()` and `.deep()` — they are only present when `V` is not a primitive type (`string`, `number`, `boolean`, `bigint`, `symbol`). This prevents calling `.each()` on a path that resolves to a leaf value.
 
+```ts
+const namePath = path((u: User) => u.profile.name);   // V = string (primitive)
+// namePath.each  ← not present in autocomplete
+
+const profilePath = path((u: User) => u.profile);     // V = { name: string }
+profilePath.each((p) => p.name)  // ✓ V is non-primitive
+```
+
+This guard is enforced at the type level — if `.each()` or `.deep()` are absent from autocomplete, the path already resolves to a scalar leaf value.
+
 ## TemplatePath\<T, V\>
 
 A path containing one or more wildcards (`*` or `**`). Returned by `.each()` and `.deep()`.

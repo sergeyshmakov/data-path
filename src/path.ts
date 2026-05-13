@@ -30,12 +30,9 @@ export function path<T, U, V = unknown>(
 ): Path<T, V>;
 export function path<T, V = unknown>(
 	baseOrExpr?: BasePath<T, unknown> | PathExpression<T, V>,
-	expr?:
-		| PathExpression<unknown, V>
-		| { segments: readonly Segment[] }
-		| unknown,
+	expr?: PathExpression<unknown, V>,
 ): Path<T, V> {
-	if (!baseOrExpr) {
+	if (baseOrExpr === undefined) {
 		return new PathImpl<T, V>([]);
 	}
 
@@ -48,24 +45,15 @@ export function path<T, V = unknown>(
 	}
 
 	const baseSegments = (baseOrExpr as BasePath<T, unknown>).segments;
-	if (expr) {
-		if (typeof expr === "function") {
-			const proxy = createPathProxy([]);
-			const result = (expr as PathExpression<unknown, V>)(proxy);
-			const tailSegments =
-				((result as Record<symbol, unknown>)?.[PATH_SEGMENTS] as Segment[]) ??
-				[];
-			return new PathImpl<T, V>([...baseSegments, ...tailSegments]);
-		}
-		if (typeof expr === "object" && expr !== null && "segments" in expr) {
-			return new PathImpl<T, V>([
-				...baseSegments,
-				...(expr as { segments: readonly Segment[] }).segments,
-			]);
-		}
+	if (expr !== undefined) {
+		const proxy = createPathProxy([]);
+		const result = (expr as PathExpression<unknown, V>)(proxy);
+		const tailSegments =
+			((result as Record<symbol, unknown>)?.[PATH_SEGMENTS] as Segment[]) ?? [];
+		return new PathImpl<T, V>([...baseSegments, ...tailSegments]);
 	}
 
-	return new PathImpl<T, V>(baseSegments as Segment[]);
+	return new PathImpl<T, V>(baseSegments);
 }
 
 /**

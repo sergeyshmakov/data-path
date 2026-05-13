@@ -32,6 +32,39 @@ profilePath.includes(namePath)   // true  — "profile" contains "profile.name"
 namePath.includes(profilePath)   // false
 ```
 
+## Wildcards and direction
+
+When one path contains wildcards (from `.each()` or `.deep()`), use whichever side reads most naturally:
+
+| Called on | Argument | Returns `true` when |
+|-----------|----------|---------------------|
+| template  | `.includes(concrete)` | template's pattern covers the concrete path |
+| concrete  | `.startsWith(template)` | concrete falls under the template prefix |
+
+```ts
+interface R { items: Array<{ name: string }> }
+
+const allNames = path((r: R) => r.items).each((i: { name: string }) => i.name);
+const one = path((r: R) => r.items[0].name);
+
+allNames.includes(one)    // true — the template covers this concrete path
+one.startsWith(allNames)  // true — the concrete falls under the template prefix
+```
+
+The two are logically equivalent — pick the form that reads naturally for your use case.
+
+For `**` (deep wildcard), any number of intermediate segments can match:
+
+```ts
+interface Root { tree: { a: { b: { c: string } } } }
+
+const deep = path((r: Root) => r.tree).deep();      // ["tree", "**"]
+const leaf = path((r: Root) => r.tree.a.b.c);       // ["tree", "a", "b", "c"]
+
+leaf.startsWith(deep)   // true — "**" matches "a.b.c"
+deep.includes(leaf)     // true
+```
+
 ## equals
 
 Returns `true` if both paths have identical segments.

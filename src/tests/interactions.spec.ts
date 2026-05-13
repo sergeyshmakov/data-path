@@ -130,6 +130,50 @@ describe("Path interactions", () => {
 		});
 	});
 
+	describe("DEEP_WILDCARD (**) in startsWith / includes", () => {
+		interface Nested {
+			tree: { a: { b: string } };
+		}
+
+		it("concrete.startsWith(deep_template) returns true when ** covers the suffix", () => {
+			const concrete = path((p: Nested) => p.tree.a.b);
+			// deep segments: ["tree", "**"]
+			const deep = path((p: Nested) => p.tree).deep();
+			expect(concrete.startsWith(deep)).toBe(true);
+		});
+
+		it("deep_template.includes(concrete) returns true", () => {
+			const concrete = path((p: Nested) => p.tree.a.b);
+			const deep = path((p: Nested) => p.tree).deep();
+			expect(deep.includes(concrete)).toBe(true);
+		});
+
+		it("concrete.startsWith(deep with suffix) returns true when ** skips intermediate segments", () => {
+			// deep segments: ["tree", "**", "value"]
+			// concrete: ["tree", "children", 0, "value"] — ** skips "children.0"
+			interface Node {
+				value: string;
+				children: Node[];
+			}
+			interface Root {
+				tree: Node;
+			}
+			const deep = path((p: Root) => p.tree).deep((n: Node) => n.value);
+			const concrete = path((p: Root) => p.tree.children[0].value);
+			expect(concrete.startsWith(deep)).toBe(true);
+		});
+
+		it("concrete.startsWith(deep with non-matching suffix) returns false", () => {
+			interface N2 {
+				foo: { bar: string; baz: string };
+			}
+			// concrete: ["foo", "bar"] — deep has suffix "baz" which doesn't match
+			const concrete = path((p: N2) => p.foo.bar);
+			const deep = path((p: N2) => p.foo).deep((n) => n.baz);
+			expect(concrete.startsWith(deep)).toBe(false);
+		});
+	});
+
 	describe("not matchable cases", () => {
 		it("returns false/null for completely disjoint paths", () => {
 			const a = path((p: R) => p.items[0].name);

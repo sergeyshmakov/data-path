@@ -49,14 +49,16 @@ const full = employeePath.merge(nameSub);
 full.$  // "departments.0.employees.5.profile.name"
 ```
 
-If the tail of the first path matches the head of the second, the overlap is removed:
+If the tail of the first path matches the head of the second, the overlap is removed. The algorithm finds the **longest** suffix of `this` that equals a prefix of `other` and joins at that point:
 
 ```ts
 const a = path((x: T) => x.a.b.c);
 const b = path((x: T) => x.b.c.d);
 
-a.merge(b).$  // "a.b.c.d"  — "b.c" overlap collapsed
+a.merge(b).$  // "a.b.c.d"  — longest overlap "b.c" collapsed, not just "c"
 ```
+
+If there is no overlap, `.merge()` is a plain concatenation — equivalent to `.to()`.
 
 ## subtract — remove a known prefix
 
@@ -75,7 +77,7 @@ relative?.$  // "name"
 full.subtract(path((c: Company) => c.departments[1]))  // null — mismatch
 ```
 
-The return type reflects the prefix's resolved type, so `relative` is correctly typed as `Path<Department, string>`.
+The return type changes the root from `Company` to `Department` — the resolved type of the prefix. This is the key DX benefit: the returned path is self-contained relative to the stripped prefix and can be passed to any function expecting a `Path<Department, V>`.
 
 ## slice — segment range
 

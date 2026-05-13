@@ -329,8 +329,10 @@ describe("Generic type preservation", () => {
 		});
 	}
 
-	// Call to materialise the describe block (TypeScript checks happen at parse time)
+	// Materialise twice: string (a Primitive) and an object type.
+	// The object call exercises the each()/deep() guard for non-primitive generics.
 	testGenerics<string>();
+	testGenerics<{ id: string }>();
 });
 
 // ---------------------------------------------------------------------------
@@ -376,6 +378,136 @@ describe("CollectionItem", () => {
 
 	it("returns unknown for non-collections", () => {
 		expectTypeOf<CollectionItem<string>>().toEqualTypeOf<unknown>();
+	});
+
+	it("extracts element from readonly array", () => {
+		expectTypeOf<CollectionItem<readonly string[]>>().toEqualTypeOf<string>();
+	});
+
+	it("extracts value from Readonly<Record<>>", () => {
+		expectTypeOf<
+			CollectionItem<Readonly<Record<string, number>>>
+		>().toEqualTypeOf<number>();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Real-world type shapes
+// ---------------------------------------------------------------------------
+
+describe("Readonly types", () => {
+	it("path through Readonly<T> resolves leaf type correctly", () => {
+		type User = Readonly<{ name: string }>;
+		const p = path((u: User) => u.name);
+		expectTypeOf(p).toEqualTypeOf<Path<User, string>>();
+	});
+
+	it(".each() is visible on a path with V = readonly array", () => {
+		type Data = { items: readonly { id: string }[] };
+		const p = path((d: Data) => d.items);
+		expectTypeOf(p.each).toBeFunction();
+	});
+
+	it(".each() on readonly array path returns correct TemplatePath item type", () => {
+		type Data = { items: readonly { id: string }[] };
+		const p = path((d: Data) => d.items);
+		const tmpl = p.each();
+		expectTypeOf(tmpl).toEqualTypeOf<TemplatePath<Data, { id: string }>>();
+	});
+
+	it(".set() on Readonly<T> path accepts and returns T", () => {
+		type User = Readonly<{ name: string }>;
+		const p = path((u: User) => u.name);
+		expectTypeOf(p.set).parameters.toEqualTypeOf<[User, string]>();
+		expectTypeOf(p.set).returns.toEqualTypeOf<User>();
+	});
+});
+
+describe("Optional and nullable property types", () => {
+	it("optional property path infers V as leaf-type | undefined", () => {
+		type User = { profile?: { name: string } };
+		// u.profile?.name: string | undefined — proxy records both segments at runtime
+		const p = path((u: User) => u.profile?.name);
+		expectTypeOf(p).toEqualTypeOf<Path<User, string | undefined>>();
+	});
+
+	it(".get() on optional-property path returns V | undefined (collapsed)", () => {
+		type User = { profile?: { name: string } };
+		const p = path((u: User) => u.profile?.name);
+		// V is already string|undefined, so get returns string|undefined|undefined = string|undefined
+		expectTypeOf(p.get).returns.toEqualTypeOf<string | undefined>();
+	});
+
+	it("nullable property (T | null) preserves null in V", () => {
+		type Data = { value: string | null };
+		const p = path((d: Data) => d.value);
+		expectTypeOf(p).toEqualTypeOf<Path<Data, string | null>>();
+	});
+
+	it(".get() on nullable path returns V | undefined = string | null | undefined", () => {
+		type Data = { value: string | null };
+		const p = path((d: Data) => d.value);
+		expectTypeOf(p.get).returns.toEqualTypeOf<string | null | undefined>();
+	});
+
+	it(".set() on nullable path accepts null as a valid value", () => {
+		type Data = { value: string | null };
+		const p = path((d: Data) => d.value);
+		expectTypeOf(p.set).parameters.toEqualTypeOf<[Data, string | null]>();
+	});
+});
+
+describe("Union value types", () => {
+	it("path to union property infers V as the full union", () => {
+		type Config = { value: string | number };
+		const p = path((c: Config) => c.value);
+		expectTypeOf(p).toEqualTypeOf<Path<Config, string | number>>();
+	});
+
+	it(".get() on union path returns union | undefined", () => {
+		type Config = { value: string | number };
+		const p = path((c: Config) => c.value);
+		expectTypeOf(p.get).returns.toEqualTypeOf<string | number | undefined>();
+	});
+
+	it(".fn on union path returns (T) => union | undefined", () => {
+		type Config = { value: string | number };
+		const p = path((c: Config) => c.value);
+		expectTypeOf(p.fn).returns.toEqualTypeOf<string | number | undefined>();
+	});
+
+	it(".set() on union path accepts any member of the union", () => {
+		type Config = { value: string | number };
+		const p = path((c: Config) => c.value);
+		expectTypeOf(p.set).parameters.toEqualTypeOf<[Config, string | number]>();
+	});
+});
+
+describe("Generic type parameters with constraints", () => {
+	it(".each() is visible when V is a concrete non-primitive array type", () => {
+		// Use a concrete array type — TypeScript can resolve [V] extends [Primitive] eagerly
+		const p = path((d: { items: Array<{ id: string }> }) => d.items);
+		expectTypeOf(p.each).toBeFunction();
+	});
+
+	it("TypeScript defers conditional type for free generic V — each() is not directly accessible", () => {
+		// When V is a free generic parameter TypeScript cannot resolve [T] extends [Primitive].
+		// Path<{items:T},T> becomes BasePath | (BasePath & TraversableMethods) — a union.
+		// Accessing .each on the union requires narrowing or casting.
+		function withItems<T extends Array<{ id: string }>>() {
+			const p = path((d: { items: T }) => d.items);
+			// @ts-expect-error — deferred conditional: .each not accessible on the union without a cast
+			p.each;
+		}
+		withItems<Array<{ id: string }>>();
+	});
+
+	it("TemplatePath.get returns V[] for constrained generic item type", () => {
+		function withItems<T extends { id: string }>() {
+			const tmpl = path((d: { items: T[] }) => d.items).each();
+			expectTypeOf(tmpl.get).returns.toEqualTypeOf<T[]>();
+		}
+		withItems<{ id: string }>();
 	});
 });
 

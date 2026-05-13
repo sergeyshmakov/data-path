@@ -5,7 +5,16 @@
 /** A path segment: string key or numeric index */
 export type Segment = string | number;
 
-/** The relation returned by .match() */
+/**
+ * The structural relation returned by `.match()`.
+ *
+ * Semantics when calling `a.match(b)`:
+ * - `"parent"`    — `a` is a prefix of `b`   (a is the parent, b is deeper)
+ * - `"child"`     — `b` is a prefix of `a`   (b is the parent, a is deeper)
+ * - `"equals"`    — `a` and `b` are identical
+ * - `"includes"`  — `a` (with wildcards) covers `b` as a concrete match
+ * - `"included-by"` — `b` (with wildcards) covers `a` as a concrete match
+ */
 export type MatchRelation =
 	| "includes"
 	| "included-by"
@@ -147,6 +156,7 @@ export interface BasePath<T = unknown, V = unknown> {
 	/**
 	 * Reads the current value, passes it to `updater`, and writes the result back immutably.
 	 * Combines `.get()` + `.set()` in a single expression.
+	 * On a `TemplatePath`, `updater` is called once per expanded match (per-item transform).
 	 *
 	 * @example
 	 * namePath.update(user, name => (name ?? "").toUpperCase())
@@ -181,9 +191,11 @@ export interface BasePath<T = unknown, V = unknown> {
 	/**
 	 * Returns the structural relationship between this path and `other`, or `null` when unrelated.
 	 *
+	 * `"parent"` means **this** path is the parent (shorter prefix); `"child"` means **this** is deeper.
+	 *
 	 * @example
-	 * namePath.match(profilePath)  // { relation: "child" }
-	 * profilePath.match(namePath)  // { relation: "parent" }
+	 * profilePath.match(namePath)  // { relation: "parent" }  — profilePath IS the parent
+	 * namePath.match(profilePath)  // { relation: "child" }   — namePath is deeper
 	 */
 	match(other: ResolvablePath<T>): MatchResult | null;
 
@@ -258,7 +270,7 @@ export type Path<T = unknown, V = unknown> = BasePath<T, V> &
  */
 export type TemplatePath<T = unknown, V = unknown> = Omit<
 	BasePath<T, V>,
-	"get" | "fn" | "to" | "merge"
+	"get" | "fn" | "to" | "merge" | "subtract"
 > & {
 	/**
 	 * Returns an array of all values matched by this template.

@@ -258,6 +258,31 @@ describe("Template paths", () => {
 		});
 	});
 
+	describe(".parent() on a template path", () => {
+		it("returns a non-template Path containing the remaining wildcard segments", () => {
+			const tmpl = path((p: User) => p.items).each((i) => i.name);
+			// segments: ["items", "*", "name"]
+			const parent = tmpl.parent();
+			expect(parent).not.toBeNull();
+			expect(parent?.segments).toEqual(["items", "*"]);
+			expect(parent?.$).toBe("items.*");
+		});
+
+		it("parent() on a single-segment template returns empty root path", () => {
+			const tmpl = path((p: User) => p.items).each();
+			// segments: ["items", "*"]  → parent → ["items"]
+			const parent = tmpl.parent()?.parent();
+			expect(parent?.segments).toEqual([]);
+		});
+
+		it("parent() of a zero-segment path returns null", () => {
+			// A TemplatePathImpl cannot have zero segments in practice, but verify
+			// the general guard via a concrete root path
+			const root = path<User>();
+			expect(root.parent()).toBeNull();
+		});
+	});
+
 	describe("typing incorrect cases", () => {
 		it("rejects .each() and .deep() on primitive values", () => {
 			const p = path((x: { name: string }) => x.name);

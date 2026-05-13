@@ -1,53 +1,33 @@
-import { DEEP_WILDCARD, PATH_SEGMENTS, WILDCARD } from "../constants.js";
+import { PATH_SEGMENTS } from "../constants.js";
 import type {
 	BasePath,
 	CollectionItem,
-	MatchResult,
 	Path,
 	ResolvablePath,
 	Segment,
 	TemplatePath,
 	TraversablePathMethods,
 } from "../types.js";
+import { createPathProxy, resolveSegments, segmentsEqual } from "../utils.js";
 import {
-	createPathProxy,
-	matchesPrefix,
-	patternMatches,
-	resolveSegments,
-	segmentsEqual,
-} from "../utils.js";
+	AbstractPathImpl,
+	DEEP_WILDCARD,
+	WILDCARD,
+} from "./base-path-impl.js";
 
 // ---------------------------------------------------------------------------
 // PathImpl — concrete path with no wildcards
 // ---------------------------------------------------------------------------
 
 export class PathImpl<T = unknown, V = unknown>
+	extends AbstractPathImpl<T, V>
 	implements BasePath<T, V>, TraversablePathMethods<T, V>
 {
-	readonly segments: readonly Segment[];
-
-	/**
-	 * Pre-bound accessor. Assigned in the constructor so `this.get` resolves
-	 * to the correct overridden version at call time (including TemplatePathImpl).
-	 */
 	readonly fn: (data: T) => V | undefined;
 
 	constructor(segments: readonly Segment[]) {
-		this.segments = segments;
-		// Assign fn once; the closure captures `this`, so overridden get() is called correctly.
+		super(segments);
 		this.fn = (data: T) => this.get(data);
-	}
-
-	get length(): number {
-		return this.segments.length;
-	}
-
-	get $(): string {
-		return this.toString();
-	}
-
-	toString(): string {
-		return this.segments.join(".");
 	}
 
 	get(data: T): V | undefined {
@@ -110,8 +90,22 @@ export class PathImpl<T = unknown, V = unknown>
 
 	parent(): Path<T, unknown> | null {
 		if (this.segments.length === 0) return null;
-		return new PathImpl<T, unknown>(
+		return makeConcrete<T, unknown>(
 			this.segments.slice(0, -1),
+		) as unknown as Path<T, unknown>;
+	}
+
+	subtract<U>(prefix: ResolvablePath<T, U>): Path<U, V> | null {
+		const a = this.segments;
+		const b = resolveSegments(prefix);
+		if (b.length > a.length) return null;
+		if (!segmentsEqual(a.slice(0, b.length), b)) return null;
+		return makeConcrete<U, V>(a.slice(b.length)) as unknown as Path<U, V>;
+	}
+
+	slice(start?: number, end?: number): Path<T, unknown> {
+		return makeConcrete<T, unknown>(
+			this.segments.slice(start, end),
 		) as unknown as Path<T, unknown>;
 	}
 
@@ -135,64 +129,18 @@ export class PathImpl<T = unknown, V = unknown>
 		]) as unknown as TemplatePath<T, U>;
 	}
 
-	startsWith(other: ResolvablePath<T>): boolean {
-		return matchesPrefix(this.segments, resolveSegments(other));
-	}
-
-	includes(other: ResolvablePath<T>): boolean {
-		return matchesPrefix(resolveSegments(other), this.segments);
-	}
-
-	equals(other: ResolvablePath<T>): boolean {
-		return segmentsEqual(this.segments, resolveSegments(other));
-	}
-
-	match(other: ResolvablePath<T>): MatchResult | null {
-		const otherSegs = resolveSegments(other);
-		if (segmentsEqual(this.segments, otherSegs)) return { relation: "equals" };
-		if (
-			matchesPrefix(this.segments, otherSegs) &&
-			this.segments.length > otherSegs.length
-		)
-			return { relation: "child" };
-		if (
-			matchesPrefix(otherSegs, this.segments) &&
-			otherSegs.length > this.segments.length
-		)
-			return { relation: "parent" };
-		if (patternMatches(this.segments, otherSegs))
-			return { relation: "includes" };
-		if (patternMatches(otherSegs, this.segments))
-			return { relation: "included-by" };
-		return null;
+	to<U>(relative: ResolvablePath<V, U>): Path<T, U> {
+		const tail = resolveSegments(relative);
+		return makeConcrete<T, U>([
+			...this.segments,
+			...tail,
+		]) as unknown as Path<T, U>;
 	}
 
 	merge<U>(other: ResolvablePath<T, U>): Path<T, U> {
-		return new PathImpl<T, U>(
+		return makeConcrete<T, U>(
 			mergeSegments(this.segments, resolveSegments(other)),
 		) as unknown as Path<T, U>;
-	}
-
-	subtract<U>(prefix: ResolvablePath<T, U>): Path<U, V> | null {
-		const a = this.segments;
-		const b = resolveSegments(prefix);
-		if (b.length > a.length) return null;
-		if (!segmentsEqual(a.slice(0, b.length), b)) return null;
-		return new PathImpl<U, V>(a.slice(b.length)) as unknown as Path<U, V>;
-	}
-
-	slice(start?: number, end?: number): Path<T, unknown> {
-		return new PathImpl<T, unknown>(
-			this.segments.slice(start, end),
-		) as unknown as Path<T, unknown>;
-	}
-
-	to<U>(relative: ResolvablePath<V, U>): Path<T, U> {
-		const tail = resolveSegments(relative);
-		return new PathImpl<T, U>([...this.segments, ...tail]) as unknown as Path<
-			T,
-			U
-		>;
 	}
 }
 
@@ -200,8 +148,70 @@ export class PathImpl<T = unknown, V = unknown>
 // TemplatePathImpl — path containing * or ** wildcards
 // ---------------------------------------------------------------------------
 
-export class TemplatePathImpl<T = unknown, V = unknown> extends PathImpl<T, V> {
-	override each<U = CollectionItem<V>>(
+export class TemplatePathImpl<T = unknown, V = unknown> extends AbstractPathImpl<
+	T,
+	V
+> {
+	// fn returns V[] (not V|undefined) — no covariance conflict since we don't
+	// extend PathImpl; the declared type here matches TemplatePath<T,V>.fn.
+	readonly fn: (data: T) => V[];
+
+	constructor(segments: readonly Segment[]) {
+		super(segments);
+		this.fn = (data: T) => this.get(data);
+	}
+
+	get(data: T): V[] {
+		return this.expand(data).map(
+			// expand() only returns paths where the key exists in data, so get() is safe
+			(p) => p.get(data) as V,
+		);
+	}
+
+	set(data: T, value: V): T {
+		const paths = this.expand(data);
+		let current = data;
+		for (const p of paths) {
+			current = p.set(current, value);
+		}
+		return current;
+	}
+
+	/**
+	 * Applies `updater` to each matched value individually (per-item transform).
+	 * Use `.set(data, constant)` to assign the same value to every match.
+	 */
+	update(data: T, updater: (current: V | undefined) => V): T {
+		const paths = this.expand(data);
+		let current = data;
+		for (const p of paths) {
+			current = p.set(current, updater(p.get(current)));
+		}
+		return current;
+	}
+
+	parent(): Path<T, unknown> | null {
+		if (this.segments.length === 0) return null;
+		return makeConcrete<T, unknown>(
+			this.segments.slice(0, -1),
+		) as unknown as Path<T, unknown>;
+	}
+
+	subtract<U>(prefix: ResolvablePath<T, U>): Path<U, V> | null {
+		const a = this.segments;
+		const b = resolveSegments(prefix);
+		if (b.length > a.length) return null;
+		if (!segmentsEqual(a.slice(0, b.length), b)) return null;
+		return makeConcrete<U, V>(a.slice(b.length)) as unknown as Path<U, V>;
+	}
+
+	slice(start?: number, end?: number): Path<T, unknown> {
+		return makeConcrete<T, unknown>(
+			this.segments.slice(start, end),
+		) as unknown as Path<T, unknown>;
+	}
+
+	each<U = CollectionItem<V>>(
 		expr?: (item: CollectionItem<V>) => U,
 	): TemplatePath<T, U> {
 		const tail = expr ? evalExpr(expr as (p: unknown) => unknown) : [];
@@ -212,7 +222,7 @@ export class TemplatePathImpl<T = unknown, V = unknown> extends PathImpl<T, V> {
 		]) as unknown as TemplatePath<T, U>;
 	}
 
-	override deep<U = V>(expr?: (leaf: V) => U): TemplatePath<T, U> {
+	deep<U = V>(expr?: (leaf: V) => U): TemplatePath<T, U> {
 		const tail = expr ? evalExpr(expr as (p: unknown) => unknown) : [];
 		return new TemplatePathImpl<T, U>([
 			...this.segments,
@@ -221,21 +231,18 @@ export class TemplatePathImpl<T = unknown, V = unknown> extends PathImpl<T, V> {
 		]) as unknown as TemplatePath<T, U>;
 	}
 
-	// Return type is Path<T,U> to satisfy class covariance (PathImpl.to returns Path<T,U>).
-	// At runtime the value IS a TemplatePathImpl; callers see TemplatePath<T,U> via the
-	// re-declaration in TemplatePath type (types.ts).
-	override to<U>(relative: ResolvablePath<V, U>): Path<T, U> {
+	to<U>(relative: ResolvablePath<V, U>): TemplatePath<T, U> {
 		const tail = resolveSegments(relative);
 		return new TemplatePathImpl<T, U>([
 			...this.segments,
 			...tail,
-		]) as unknown as Path<T, U>;
+		]) as unknown as TemplatePath<T, U>;
 	}
 
-	override merge<U>(other: ResolvablePath<T, U>): Path<T, U> {
+	merge<U>(other: ResolvablePath<T, U>): TemplatePath<T, U> {
 		return new TemplatePathImpl<T, U>(
 			mergeSegments(this.segments, resolveSegments(other)),
-		) as unknown as Path<T, U>;
+		) as unknown as TemplatePath<T, U>;
 	}
 
 	/**
@@ -295,38 +302,15 @@ export class TemplatePathImpl<T = unknown, V = unknown> extends PathImpl<T, V> {
 		walk(data, 0, []);
 		return results;
 	}
-
-	// @ts-expect-error: TemplatePath.get returns V[] not V|undefined
-	override get(data: T): V[] {
-		return this.expand(data).map((p) => p.get(data) as V);
-	}
-
-	override set(data: T, value: V): T {
-		const paths = this.expand(data);
-		let current = data;
-		for (const p of paths) {
-			current = p.set(current, value);
-		}
-		return current;
-	}
-
-	/**
-	 * Applies `updater` to each matched value individually (per-item transform).
-	 * Use `.set(data, constant)` to assign the same value to every match.
-	 */
-	override update(data: T, updater: (current: V | undefined) => V): T {
-		const paths = this.expand(data);
-		let current = data;
-		for (const p of paths) {
-			current = p.set(current, updater(p.get(current)));
-		}
-		return current;
-	}
 }
 
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
+
+function makeConcrete<T, V>(segments: readonly Segment[]): PathImpl<T, V> {
+	return new PathImpl<T, V>(segments);
+}
 
 function evalExpr(expr: (proxy: unknown) => unknown): readonly Segment[] {
 	const proxy = createPathProxy([]);

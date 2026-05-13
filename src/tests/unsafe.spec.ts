@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { unsafePath } from "../index.js";
+import { path, unsafePath } from "../index.js";
 
 describe("unsafePath()", () => {
 	describe("creation", () => {
@@ -97,6 +97,36 @@ describe("unsafePath()", () => {
 				// @ts-expect-error
 				unsafePath({ path: "a.b" });
 			}).toThrow();
+		});
+	});
+
+	describe("wildcard segments", () => {
+		it("'*' in the string becomes a literal segment stored as '*'", () => {
+			const p = unsafePath<object>("a.*.b");
+			expect(p.segments).toEqual(["a", "*", "b"]);
+		});
+
+		it("unsafePath with '*' segment does literal key lookup via .get(), not template expansion", () => {
+			// PathImpl.get() walks segments literally — "*" is looked up as an object key.
+			// To expand wildcards, use path().each() instead of unsafePath.
+			type Data = { items: Record<string, { name: string }> };
+			const p = unsafePath<Data, string>("items.*.name");
+			const data: Data = {
+				items: { "*": { name: "star" }, a: { name: "alpha" } },
+			};
+			expect(p.get(data)).toBe("star"); // literal key "*" is found
+		});
+
+		it("unsafePath with '*' segment participates in wildcard matching for startsWith/includes", () => {
+			// The "*" segment is treated as a wildcard by matchesPrefix / patternMatches,
+			// so relational methods see it as a template.
+			type Data = { items: Array<{ name: string }> };
+			const template = unsafePath<Data>("items.*.name");
+			const concrete = path((p: Data) => p.items[0].name);
+			// template.includes(concrete): matchesPrefix(["items",0,"name"], ["items","*","name"])
+			// "*" matches 0 → true
+			expect(template.includes(concrete)).toBe(true);
+			expect(concrete.startsWith(template)).toBe(true);
 		});
 	});
 });

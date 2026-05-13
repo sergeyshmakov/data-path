@@ -75,12 +75,13 @@ When a component receives a base path and needs to extend it:
 3. Or merge with another path: `employeePath.merge(firstNamePath)` (handles segment overlap).
 4. Subtract for a relative path: `fullPath.subtract(employeePath)` — returns `Path<Employee, V>` or `null`.
 
-### Workflow 6: Parent Navigation
+### Workflow 6: Path Navigation
 
-When you need the parent of a known path:
+When you need to navigate up or extract a sub-section of a path:
 
-1. `path((u: User) => u.profile.name).parent()` → path for `"profile"`.
-2. Returns `null` for a root (zero-segment) path.
+1. **Parent**: `path((u: User) => u.profile.name).parent()` → `"profile"`. Returns `null` at root — always guard with `?.` when chaining: `p.parent()?.parent()`.
+2. **Slice**: `p.slice(start?, end?)` follows `Array.prototype.slice` on the segment array. `p.slice(0, 2)` takes the first two segments; `p.slice(-2)` takes the last two. Useful for extracting dynamic sub-paths.
+3. **Subtract for typed prefix removal**: see Workflow 5 — `subtract` changes the root type from the full-path root to the resolved type of the prefix.
 
 ## Key Rules
 
@@ -89,6 +90,8 @@ When you need the parent of a known path:
 - **`.get()` returns `undefined`** if any intermediate segment is missing; it does not throw.
 - **`.set()` and `.update()` are immutable**: Both return a new object. Use with functional updaters.
 - **`.each()` and `.deep()`** require a non-primitive value at the path; they are not available on paths ending in `string`, `number`, etc.
+- **`.parent()` returns `null` at root**: Always guard with optional chaining when chaining: `p.parent()?.parent()`.
+- **`.slice(start?, end?)` uses array semantics**: Negative indices count from the end of the segment array; returns `Path<T, unknown>` as the leaf type is not statically known after slicing.
 - **`ResolvablePath` is accepted everywhere**: `.to()`, `.merge()`, `.subtract()`, `.startsWith()`, `.includes()`, `.equals()`, and `.match()` all accept a lambda, a pre-built `Path`, or a `{segments}` object.
 - **TemplatePath overrides**: On a `TemplatePath`, `.get()` returns `V[]`, `.fn` returns `(data: T) => V[]`, `.to()` and `.merge()` return `TemplatePath` (preserving wildcard behavior).
 
