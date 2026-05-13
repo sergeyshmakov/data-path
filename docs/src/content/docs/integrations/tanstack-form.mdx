@@ -1,0 +1,106 @@
+---
+title: TanStack Form
+description: Typed field names for Field, useField, and nested arrays in TanStack Form.
+---
+
+TanStack Form identifies fields by the `name` prop on `<Field>`. For nested structures this is a dot-notation string like `"users[0].firstName"`. `data-path` provides a typed source of truth for these names, with full support for runtime indices.
+
+## Basic usage
+
+```tsx
+import { useForm } from "@tanstack/react-form";
+import { path } from "data-path";
+
+type FormValues = {
+  profile: { firstName: string; lastName: string };
+  email: string;
+};
+
+const firstNamePath = path((f: FormValues) => f.profile.firstName);
+
+function ProfileForm() {
+  const form = useForm<FormValues>({
+    defaultValues: { profile: { firstName: "", lastName: "" }, email: "" },
+    onSubmit: ({ value }) => console.log(value),
+  });
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); form.handleSubmit(); }}>
+      <form.Field name={firstNamePath.$}>
+        {(field) => (
+          <input
+            value={field.state.value}
+            onChange={(e) => field.handleChange(e.target.value)}
+          />
+        )}
+      </form.Field>
+      <button type="submit">Save</button>
+    </form>
+  );
+}
+```
+
+## Nested arrays with runtime indices
+
+```tsx
+import { useForm } from "@tanstack/react-form";
+import { path } from "data-path";
+
+type FormValues = { users: Array<{ firstName: string; email: string }> };
+
+function UsersForm() {
+  const form = useForm<FormValues>({
+    defaultValues: { users: [{ firstName: "", email: "" }] },
+    onSubmit: ({ value }) => console.log(value),
+  });
+
+  return (
+    <form>
+      {form.state.values.users.map((_, i) => {
+        const firstName = path((f: FormValues) => f.users[i].firstName);
+        const email = path((f: FormValues) => f.users[i].email);
+
+        return (
+          <div key={i}>
+            <form.Field name={firstName.$}>
+              {(field) => (
+                <input
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              )}
+            </form.Field>
+            <form.Field name={email.$}>
+              {(field) => (
+                <input
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                />
+              )}
+            </form.Field>
+          </div>
+        );
+      })}
+    </form>
+  );
+}
+```
+
+## Shared path definitions
+
+Define paths once and share them between the form and validation logic:
+
+```ts
+const emailPath = path((f: FormValues) => f.email);
+
+// Used for field registration
+<form.Field name={emailPath.$} ... />
+
+// Used for programmatic access
+const current = emailPath.get(form.state.values);
+```
+
+## See also
+
+- [Runtime Variables](/data-path/guides/runtime-variables/) — how lambdas capture loop indices
+- [React Hook Form](/data-path/integrations/react-hook-form/) — the same pattern for React Hook Form

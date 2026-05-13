@@ -25,12 +25,11 @@ export interface MatchResult {
  * const agePath = path<User>(p => p.profile.age);
  * type Age = ResolvedType<typeof agePath>; // number
  */
-export type ResolvedType<P> =
-	P extends { get(data: any): (infer V)[] }
-		? V // TemplatePath: get() returns V[]
-		: P extends BasePath<any, infer V>
-			? V // Path: get() returns V|undefined
-			: never;
+export type ResolvedType<P> = P extends { get(data: any): (infer V)[] }
+	? V // TemplatePath: get() returns V[]
+	: P extends BasePath<any, infer V>
+		? V // Path: get() returns V|undefined
+		: never;
 
 /**
  * Extracts the item type from a collection (Array or Record).
@@ -323,6 +322,4 @@ export type PathConstructor = {
 };
 
 /** Call signature of the `unsafePath()` function */
-export type UnsafePathConstructor = <T, V = unknown>(
-	raw: string,
-) => Path<T, V>;
+export type UnsafePathConstructor = <T, V = unknown>(raw: string) => Path<T, V>;

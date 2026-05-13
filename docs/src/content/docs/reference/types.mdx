@@ -1,0 +1,130 @@
+---
+title: Types
+description: TypeScript types exported from data-path.
+---
+
+## Path\<T, V\>
+
+A concrete path with no wildcards. `T` is the root type, `V` is the type at the leaf.
+
+```ts
+import type { Path } from "data-path";
+
+function register<T>(fieldPath: Path<T, string>, value: string) {
+  // fieldPath.$ is the dot-notation name
+  // fieldPath.get(data) returns string | undefined
+}
+```
+
+`Path<T, V>` conditionally includes `.each()` and `.deep()` — they are only present when `V` is not a primitive type (`string`, `number`, `boolean`, `bigint`, `symbol`). This prevents calling `.each()` on a path that resolves to a leaf value.
+
+## TemplatePath\<T, V\>
+
+A path containing one or more wildcards (`*` or `**`). Returned by `.each()` and `.deep()`.
+
+```ts
+import type { TemplatePath } from "data-path";
+
+function processAll<T, V>(
+  tmpl: TemplatePath<T, V>,
+  data: T,
+  transform: (v: V) => V,
+): T {
+  return tmpl.update(data, transform);
+}
+```
+
+Key differences from `Path`:
+- `.get(data)` returns `V[]` instead of `V | undefined`
+- `.fn` is `(data: T) => V[]`
+- `.expand(data)` returns `Path<T, V>[]`
+- `.to()` and `.merge()` return `TemplatePath<T, U>` rather than `Path<T, U>`
+
+## BasePath\<T, V\>
+
+The shared base type for both `Path` and `TemplatePath`. Use it when your function accepts either kind:
+
+```ts
+import type { BasePath } from "data-path";
+
+function getSegmentString<T, V>(p: BasePath<T, V>): string {
+  return p.$;
+}
+```
+
+`BasePath` does not include `.each()`, `.deep()`, `.expand()`, or the overridden `get`/`fn` signatures of `TemplatePath`.
+
+## ResolvedType\<P\>
+
+Extracts the leaf type `V` from a `Path` or `TemplatePath`:
+
+```ts
+import type { ResolvedType } from "data-path";
+
+const agePath = path((u: User) => u.profile.age);
+type Age = ResolvedType<typeof agePath>;  // number
+
+const nameTmpl = path((u: User) => u.tags).each();
+type Tag = ResolvedType<typeof nameTmpl>;  // string
+```
+
+Returns `never` for non-path types.
+
+## CollectionItem\<V\>
+
+Extracts the element type from an array or the value type from a `Record`:
+
+```ts
+import type { CollectionItem } from "data-path";
+
+type A = CollectionItem<string[]>;              // string
+type B = CollectionItem<Record<string, number>>; // number
+type C = CollectionItem<string>;                // unknown
+```
+
+Used as the default value type in `.each()` — `each()` without an argument returns `TemplatePath<T, CollectionItem<V>>`.
+
+## Segment
+
+A single path segment — either a `string` or a `number`:
+
+```ts
+import type { Segment } from "data-path";
+
+const segments: Segment[] = ["profile", "tags", 0];
+```
+
+## MatchResult
+
+The return type of `.match()`:
+
+```ts
+import type { MatchResult } from "data-path";
+
+type MatchResult = {
+  relation: "equals" | "parent" | "child" | "includes" | "included-by";
+};
+```
+
+| Relation | Meaning |
+|----------|---------|
+| `"equals"` | Both paths are identical |
+| `"parent"` | `this` is a prefix of `other` |
+| `"child"` | `other` is a prefix of `this` |
+| `"includes"` | `this` contains a wildcard matching `other` |
+| `"included-by"` | `other` contains a wildcard matching `this` |
+
+## ResolvablePath\<T, V\>
+
+Accepted by all relational and algebra methods. Any of:
+
+- `Path<T, V>` or `TemplatePath<T, V>`
+- A lambda `(proxy: T) => V`
+- An object `{ segments: readonly Segment[] }`
+
+This lets methods like `.merge()`, `.subtract()`, `.equals()`, and `.startsWith()` accept inline lambdas:
+
+```ts
+namePath.startsWith((u: User) => u.profile);
+namePath.subtract((u: User) => u.profile);
+```

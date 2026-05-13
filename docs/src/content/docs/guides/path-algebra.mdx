@@ -1,0 +1,109 @@
+---
+title: Path algebra
+description: Compose and decompose paths with merge, subtract, slice, to, and parent.
+---
+
+Path algebra is useful when building reusable components or functions that work with paths at different levels of a data structure. A component can hold a relative path; its parent supplies the base; `merge` combines them.
+
+## to — extend a path
+
+Appends a relative path expressed as a lambda or an existing `Path`:
+
+```ts
+import { path } from "data-path";
+
+type User = { profile: { name: string; age: number } };
+
+const profilePath = path((u: User) => u.profile);
+const namePath = profilePath.to((p) => p.name);
+
+namePath.$  // "profile.name"
+```
+
+You can also pass a pre-built `Path<V, U>`:
+
+```ts
+type Profile = { name: string };
+
+const nameRelative = path((p: Profile) => p.name);
+const fullName = profilePath.to(nameRelative);  // Path<User, string>
+```
+
+On a template path, `.to()` returns a template path so expansion is preserved:
+
+```ts
+const allNames = path((u: AppData) => u.users).each().to((u) => u.name);
+allNames.$  // "users.*.name"
+allNames.get(data)  // ["Alice", "Bob"]
+```
+
+## merge — overlap-aware concatenation
+
+`.merge(other)` appends `other` to the path, deduplicating any suffix/prefix overlap. This is the right tool when two paths were built independently but may share a common junction:
+
+```ts
+const employeePath = path((c: Company) => c.departments[0].employees[5]);
+const nameSub = path((e: Employee) => e.profile.name);
+
+const full = employeePath.merge(nameSub);
+full.$  // "departments.0.employees.5.profile.name"
+```
+
+If the tail of the first path matches the head of the second, the overlap is removed:
+
+```ts
+const a = path((x: T) => x.a.b.c);
+const b = path((x: T) => x.b.c.d);
+
+a.merge(b).$  // "a.b.c.d"  — "b.c" overlap collapsed
+```
+
+## subtract — remove a known prefix
+
+`.subtract(prefix)` returns a new path with the prefix stripped, or `null` if the prefix does not match:
+
+```ts
+type Company = { departments: Array<{ name: string }> };
+type Department = { name: string };
+
+const full = path((c: Company) => c.departments[0].name);
+const prefix = path((c: Company) => c.departments[0]);
+
+const relative = full.subtract(prefix);  // Path<Department, string> | null
+relative?.$  // "name"
+
+full.subtract(path((c: Company) => c.departments[1]))  // null — mismatch
+```
+
+The return type reflects the prefix's resolved type, so `relative` is correctly typed as `Path<Department, string>`.
+
+## slice — segment range
+
+`.slice(start?, end?)` follows `Array.prototype.slice` semantics:
+
+```ts
+const p = path((c: Company) => c.departments[0].employees[5].profile.name);
+p.$  // "departments.0.employees.5.profile.name"
+
+p.slice(0, 3).$  // "departments.0.employees"
+p.slice(-2).$    // "profile.name"
+```
+
+Useful when a path was built dynamically and you need a subsection of it.
+
+## parent — drop the last segment
+
+```ts
+const namePath = path((u: User) => u.profile.name);
+
+namePath.parent().$  // "profile"
+namePath.parent()?.parent().$  // ""  (root path)
+namePath.parent()?.parent()?.parent()  // null — already at root
+```
+
+`.parent()` returns `null` on a root (zero-segment) path.
+
+## See also
+
+- [Relational](/data-path/guides/relational/) — `startsWith`, `includes`, `match` for comparing paths
+- [Templates](/data-path/guides/templates/) — `to` on template paths

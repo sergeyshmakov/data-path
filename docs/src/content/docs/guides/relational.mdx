@@ -1,0 +1,95 @@
+---
+title: Relational
+description: Compare paths with startsWith, includes, equals, and match.
+---
+
+Relational methods are useful for permissions checks, validation mapping, and UI logic where you need to know how two paths relate — whether one is a prefix of another, whether they overlap, or what structural relationship they have.
+
+## startsWith
+
+Returns `true` if the path begins with every segment of `other`.
+
+```ts
+import { path } from "data-path";
+
+type User = { profile: { name: string; age: number } };
+
+const namePath = path((u: User) => u.profile.name);
+const profilePath = path((u: User) => u.profile);
+
+namePath.startsWith(profilePath)   // true  — "profile.name" starts with "profile"
+profilePath.startsWith(namePath)   // false
+```
+
+The argument can be a `Path`, a lambda, or a `{ segments }` object.
+
+## includes
+
+Returns `true` if `other` is a prefix of the path (the inverse of `startsWith`).
+
+```ts
+profilePath.includes(namePath)   // true  — "profile" contains "profile.name"
+namePath.includes(profilePath)   // false
+```
+
+## equals
+
+Returns `true` if both paths have identical segments.
+
+```ts
+const p1 = path((u: User) => u.profile.name);
+const p2 = path((u: User) => u.profile.name);
+
+p1.equals(p2)   // true
+p1.equals(profilePath)   // false
+```
+
+## match
+
+Returns a `MatchResult` describing the structural relationship, or `null` if there is none.
+
+```ts
+type MatchResult = {
+  relation: "equals" | "parent" | "child" | "includes" | "included-by";
+};
+```
+
+```ts
+namePath.match(profilePath)  // { relation: "child" }   — name is under profile
+profilePath.match(namePath)  // { relation: "parent" }  — profile contains name
+namePath.match(namePath)     // { relation: "equals" }
+
+const unrelated = path((u: User) => u.profile.age);
+namePath.match(unrelated)    // null — no relationship
+```
+
+Relation meanings:
+
+| Relation | Meaning |
+|----------|---------|
+| `"equals"` | Both paths are identical |
+| `"parent"` | `this` is a prefix of `other` |
+| `"child"` | `other` is a prefix of `this` |
+| `"includes"` | `this` contains a wildcard that matches `other` |
+| `"included-by"` | `other` contains a wildcard that matches `this` |
+
+## Practical example — permission guard
+
+```ts
+type Store = { users: User[]; settings: { theme: string } };
+
+const settingsPath = path((s: Store) => s.settings);
+
+function canWrite(targetPath: Path<Store, unknown>): boolean {
+  // Allow writes only outside the settings subtree
+  return !targetPath.startsWith(settingsPath);
+}
+
+canWrite(path((s: Store) => s.users[0].name))    // true
+canWrite(path((s: Store) => s.settings.theme))   // false
+```
+
+## See also
+
+- [Path Algebra](/data-path/guides/path-algebra/) — `merge`, `subtract`, `slice`
+- [Types](/data-path/reference/types/) — `MatchResult` and `ResolvablePath`

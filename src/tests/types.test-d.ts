@@ -101,12 +101,18 @@ describe("Data access types", () => {
 describe("parent()", () => {
 	it("returns Path<T, unknown> | null", () => {
 		const p = path((x: { a: { b: string } }) => x.a.b);
-		expectTypeOf(p.parent()).toEqualTypeOf<Path<{ a: { b: string } }, unknown> | null>();
+		expectTypeOf(p.parent()).toEqualTypeOf<Path<
+			{ a: { b: string } },
+			unknown
+		> | null>();
 	});
 
 	it("root path parent() returns null at runtime (type is Path|null)", () => {
 		const p = path<{ a: string }>();
-		expectTypeOf(p.parent()).toEqualTypeOf<Path<{ a: string }, unknown> | null>();
+		expectTypeOf(p.parent()).toEqualTypeOf<Path<
+			{ a: string },
+			unknown
+		> | null>();
 	});
 });
 
@@ -363,7 +369,9 @@ describe("CollectionItem", () => {
 	});
 
 	it("extracts record value type", () => {
-		expectTypeOf<CollectionItem<Record<string, number>>>().toEqualTypeOf<number>();
+		expectTypeOf<
+			CollectionItem<Record<string, number>>
+		>().toEqualTypeOf<number>();
 	});
 
 	it("returns unknown for non-collections", () => {

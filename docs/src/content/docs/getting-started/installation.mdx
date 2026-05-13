@@ -1,0 +1,48 @@
+---
+title: Installation
+description: Install data-path and configure TypeScript.
+---
+
+## Install
+
+```bash
+npm install data-path
+```
+
+## Requirements
+
+- Node `>=20`
+- TypeScript `>=5.0`
+
+## TypeScript configuration
+
+No special flags are required. A minimal `tsconfig.json` that works:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true
+  }
+}
+```
+
+`strict: true` is recommended — it enables full inference through lambda parameters. Without it, some path expressions may resolve to `unknown` instead of the correct leaf type.
+
+## Verify the install
+
+```ts
+import { path } from "data-path";
+
+type User = { name: string };
+const p = path((u: User) => u.name);
+console.log(p.$); // "name"
+```
+
+If this compiles and logs `"name"`, the package is correctly installed.
+
+## Next
+
+- [Quick Start](/data-path/getting-started/quick-start/) — a complete working example.

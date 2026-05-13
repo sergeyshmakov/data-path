@@ -1,0 +1,105 @@
+---
+title: Data access
+description: Read and write data through typed paths with get, set, update, and fn.
+---
+
+## Creating paths
+
+Three forms, all producing the same `Path<T, V>` type:
+
+```ts
+import { path, unsafePath } from "data-path";
+
+type User = { profile: { name: string }; tags: string[] };
+
+// Annotation form — recommended, infers both T and V
+const namePath = path((u: User) => u.profile.name);
+
+// Both-explicit form — use when T and V are needed separately
+const tagsPath = path<User, string[]>((u) => u.tags);
+
+// Root path — start here, extend with .to()
+const root = path<User>();
+const nameViaRoot = root.to((u) => u.profile.name);
+
+// From a raw string — for dynamic contexts (API responses, Zod issues)
+const dynamic = unsafePath<User>("profile.name");
+```
+
+## get
+
+Traverses each segment, returning `undefined` if any intermediate is `null` or `undefined`.
+
+```ts
+const user: User = { profile: { name: "Alice" }, tags: [] };
+
+namePath.get(user)   // "Alice"
+namePath.get(null)   // undefined — no throw
+namePath.get({} as User)  // undefined — "profile" is missing
+```
+
+The return type is `V | undefined` — the path cannot guarantee the value exists at runtime.
+
+## set
+
+Returns a structural clone with the value updated at the path. Every object along the path is cloned; everything else is shared.
+
+```ts
+const updated = namePath.set(user, "Bob");
+
+updated.profile.name  // "Bob"
+user.profile.name     // "Alice" — original unchanged
+updated.tags === user.tags  // true — unaffected branches are shared
+```
+
+If a segment points into an array, the array is cloned rather than the parent object:
+
+```ts
+type AppData = { items: string[] };
+const firstItemPath = path((d: AppData) => d.items[0]);
+const data: AppData = { items: ["a", "b"] };
+
+const next = firstItemPath.set(data, "x");
+next.items   // ["x", "b"]
+data.items   // ["a", "b"] — unchanged
+```
+
+## update
+
+Reads the current value, passes it to the updater, then writes the result. Equivalent to `path.set(data, updater(path.get(data)))`.
+
+```ts
+const incremented = scorePath.update(game, (n) => (n ?? 0) + 1);
+```
+
+The updater receives `V | undefined` — handle the `undefined` case explicitly when the value might be absent.
+
+## fn
+
+A stable `(data: T) => V | undefined` function reference. It is assigned once in the constructor and does not change, so it is safe to use as a dependency or pass to array methods:
+
+```ts
+const users: User[] = [user1, user2, user3];
+const names = users.map(namePath.fn);  // (string | undefined)[]
+
+// React example — stable reference avoids unnecessary re-renders
+const value = useMemo(() => namePath.fn(state), [state]);
+```
+
+For template paths (`each`, `deep`), `.fn` returns `V[]` instead of `V | undefined`.
+
+## String properties
+
+```ts
+namePath.$         // "profile.name"
+namePath.segments  // ["profile", "name"]
+namePath.length    // 2
+```
+
+`.segments` is a readonly array of `string | number`. Numeric segments represent array indices.
+
+## See also
+
+- [Templates](/data-path/guides/templates/) — bulk reads and writes across collections
+- [Path Algebra](/data-path/guides/path-algebra/) — compose and decompose paths
+- [Runtime Variables](/data-path/guides/runtime-variables/) — indices and closures inside lambdas

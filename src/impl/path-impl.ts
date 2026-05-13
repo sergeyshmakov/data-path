@@ -160,7 +160,8 @@ export class PathImpl<T = unknown, V = unknown>
 			otherSegs.length > this.segments.length
 		)
 			return { relation: "parent" };
-		if (patternMatches(this.segments, otherSegs)) return { relation: "includes" };
+		if (patternMatches(this.segments, otherSegs))
+			return { relation: "includes" };
 		if (patternMatches(otherSegs, this.segments))
 			return { relation: "included-by" };
 		return null;
@@ -188,7 +189,10 @@ export class PathImpl<T = unknown, V = unknown>
 
 	to<U>(relative: ResolvablePath<V, U>): Path<T, U> {
 		const tail = resolveSegments(relative);
-		return new PathImpl<T, U>([...this.segments, ...tail]) as unknown as Path<T, U>;
+		return new PathImpl<T, U>([...this.segments, ...tail]) as unknown as Path<
+			T,
+			U
+		>;
 	}
 }
 
@@ -196,10 +200,7 @@ export class PathImpl<T = unknown, V = unknown>
 // TemplatePathImpl — path containing * or ** wildcards
 // ---------------------------------------------------------------------------
 
-export class TemplatePathImpl<
-	T = unknown,
-	V = unknown,
-> extends PathImpl<T, V> {
+export class TemplatePathImpl<T = unknown, V = unknown> extends PathImpl<T, V> {
 	override each<U = CollectionItem<V>>(
 		expr?: (item: CollectionItem<V>) => U,
 	): TemplatePath<T, U> {
@@ -243,11 +244,7 @@ export class TemplatePathImpl<
 	expand(data: T): Path<T, V>[] {
 		const results: Path<T, V>[] = [];
 
-		const walk = (
-			current: unknown,
-			idx: number,
-			acc: Segment[],
-		): void => {
+		const walk = (current: unknown, idx: number, acc: Segment[]): void => {
 			if (idx >= this.segments.length) {
 				results.push(new PathImpl<T, V>(acc));
 				return;
@@ -260,11 +257,10 @@ export class TemplatePathImpl<
 						? (Array.from(current.keys()) as number[])
 						: Object.keys(current);
 					for (const key of keys) {
-						walk(
-							(current as Record<string | number, unknown>)[key],
-							idx + 1,
-							[...acc, key],
-						);
+						walk((current as Record<string | number, unknown>)[key], idx + 1, [
+							...acc,
+							key,
+						]);
 					}
 				}
 			} else if (seg === DEEP_WILDCARD) {
@@ -276,11 +272,10 @@ export class TemplatePathImpl<
 						? (Array.from(current.keys()) as number[])
 						: Object.keys(current);
 					for (const key of keys) {
-						walk(
-							(current as Record<string | number, unknown>)[key],
-							idx,
-							[...acc, key],
-						);
+						walk((current as Record<string | number, unknown>)[key], idx, [
+							...acc,
+							key,
+						]);
 					}
 				}
 			} else {
@@ -289,11 +284,10 @@ export class TemplatePathImpl<
 					typeof current === "object" &&
 					seg in (current as object)
 				) {
-					walk(
-						(current as Record<string | number, unknown>)[seg],
-						idx + 1,
-						[...acc, seg],
-					);
+					walk((current as Record<string | number, unknown>)[seg], idx + 1, [
+						...acc,
+						seg,
+					]);
 				}
 			}
 		};

@@ -1,8 +1,8 @@
 {
 	"name": "data-path",
 	"version": "1.0.0",
-	"description": "A simple, modern, zero-dependency, and fully type-safe library for building, comparing, and manipulating object property paths using TypeScript lambda expressions.",
-	"license": "ISC",
+	"description": "Type-safe object path builder, accessor, and algebra for TypeScript.",
+	"license": "MIT",
 	"type": "commonjs",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
@@ -32,12 +32,16 @@
 		"typescript",
 		"path",
 		"object-path",
+		"property-path",
 		"type-safe",
 		"proxy",
+		"lambda",
 		"dot-notation",
-		"property-path",
 		"accessor",
-		"data-path"
+		"immutable",
+		"path-algebra",
+		"state-management",
+		"form"
 	],
 	"author": {
 		"name": "Sergei Shmakov",

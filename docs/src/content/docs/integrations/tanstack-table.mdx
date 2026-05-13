@@ -1,0 +1,93 @@
+---
+title: TanStack Table
+description: Typed column accessors and id strings for TanStack Table (React Table).
+---
+
+TanStack Table column definitions require an `accessor` function and an `id` string when using a function accessor. These two values always refer to the same field — they must stay in sync manually. `data-path` keeps them in sync automatically: `.fn` provides the accessor function and `.$` provides the string id.
+
+## Basic usage
+
+```ts
+import { createColumnHelper } from "@tanstack/react-table";
+import { path } from "data-path";
+
+type User = { id: string; contact: { email: string }; name: string };
+
+const columnHelper = createColumnHelper<User>();
+
+const emailPath = path((u: User) => u.contact.email);
+const namePath = path((u: User) => u.name);
+
+const columns = [
+  columnHelper.accessor(namePath.fn, {
+    id: namePath.$,
+    header: "Name",
+    cell: (info) => info.getValue(),
+  }),
+  columnHelper.accessor(emailPath.fn, {
+    id: emailPath.$,
+    header: "Email",
+    cell: (info) => info.getValue(),
+  }),
+];
+```
+
+`emailPath.fn` is `(u: User) => string | undefined` — TanStack Table expects `(row: T) => V`. The types align directly.
+
+## Nested paths
+
+Deep paths work the same way — the column accessor and id stay in sync regardless of nesting depth:
+
+```ts
+type Order = {
+  id: string;
+  customer: { profile: { firstName: string; lastName: string } };
+  total: number;
+};
+
+const firstNamePath = path((o: Order) => o.customer.profile.firstName);
+
+columnHelper.accessor(firstNamePath.fn, {
+  id: firstNamePath.$,    // "customer.profile.firstName"
+  header: "First name",
+})
+```
+
+## Sorting and filtering
+
+The path string is also useful when configuring column sort fields or filter keys that reference the same property:
+
+```ts
+const columns = [
+  columnHelper.accessor(emailPath.fn, {
+    id: emailPath.$,
+    header: "Email",
+    enableSorting: true,
+    sortingFn: "alphanumeric",
+  }),
+];
+
+// In global filter, compare against path string
+const rowMatchesFilter = (row: User, filter: string) =>
+  emailPath.get(row)?.includes(filter) ?? false;
+```
+
+## Path-driven column registry
+
+Build a column registry where path definitions drive both the accessor and the display name:
+
+```ts
+function col<T, V>(p: ReturnType<typeof path<T, V>>, header: string) {
+  return columnHelper.accessor(p.fn as (row: T) => V, { id: p.$, header });
+}
+
+const columns = [
+  col(namePath, "Name"),
+  col(emailPath, "Email"),
+];
+```
+
+## See also
+
+- [Data access](/data-path/guides/data-access/) — `fn`, `get`, and `set`
+- [Types](/data-path/reference/types/) — `Path<T, V>` and `ResolvedType`

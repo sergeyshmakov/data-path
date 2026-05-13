@@ -1,0 +1,77 @@
+---
+title: API cheatsheet
+description: Every method and property on Path and TemplatePath at a glance.
+---
+
+## Creation
+
+| Expression | Returns | Description |
+|------------|---------|-------------|
+| `path<T>()` | `Path<T, T>` | Root path with zero segments |
+| `path((p: T) => p.a.b)` | `Path<T, V>` | Lambda form — annotate the parameter to infer both `T` and `V` |
+| `path<T, V>((p) => p.a.b)` | `Path<T, V>` | Both generics explicit |
+| `path(base, (p) => p.c)` | `Path<T, V>` | Extend an existing base path |
+| `unsafePath<T>("a.b")` | `Path<T, unknown>` | From a raw dot-notation string |
+| `unsafePath<T, V>("a.b")` | `Path<T, V>` | From a raw string with explicit leaf type |
+
+## Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `path.$` | `string` | Dot-notation string (`"profile.firstName"`) |
+| `path.segments` | `readonly (string \| number)[]` | Array of segments |
+| `path.length` | `number` | Number of segments |
+| `path.fn` | `(data: T) => V \| undefined` | Stable accessor — same reference on every access |
+
+On template paths, `fn` returns `V[]` instead of `V | undefined`.
+
+## Data access
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `.get(data)` | `(T) => V \| undefined` | Read value at path; returns `undefined` if any segment is missing |
+| `.set(data, value)` | `(T, V) => T` | Immutable write — returns a structural clone |
+| `.update(data, fn)` | `(T, (V \| undefined) => V) => T` | Read-modify-write in one call |
+
+On template paths, `.get()` returns `V[]` and `.set()` / `.update()` apply to all matched paths.
+
+## Traversal and composition
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `.to(lambda \| path)` | `Path<T, U>` | Extend the path to a deeper property |
+| `.parent()` | `Path<T, unknown> \| null` | Remove the last segment; `null` at root |
+| `.merge(other)` | `Path<T, U>` | Overlap-aware concatenation |
+| `.subtract(prefix)` | `Path<U, V> \| null` | Remove a prefix; `null` if prefix doesn't match |
+| `.slice(start?, end?)` | `Path<T, unknown>` | Slice segments like `Array.prototype.slice` |
+
+## Template paths
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `.each()` | `TemplatePath<T, CollectionItem<V>>` | Wildcard over every key of the current collection |
+| `.each(expr)` | `TemplatePath<T, U>` | Wildcard then navigate each item |
+| `.deep()` | `TemplatePath<T, V>` | Recursive descent wildcard |
+| `.deep(expr)` | `TemplatePath<T, U>` | Recursive descent then navigate |
+| `.expand(data)` | `Path<T, V>[]` | Resolve template to concrete paths that exist in `data` |
+
+`each` and `deep` are only available when `V` is not a primitive type.
+
+Template paths also support `.to()` and `.merge()` — both return `TemplatePath<T, U>` to preserve expansion.
+
+## Relational
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `.startsWith(other)` | `boolean` | `true` if this path begins with every segment of `other` |
+| `.includes(other)` | `boolean` | `true` if `other` is a prefix of this path |
+| `.equals(other)` | `boolean` | `true` if both paths have identical segments |
+| `.match(other)` | `MatchResult \| null` | Structural relationship, or `null` if none |
+
+## ResolvablePath
+
+All relational and algebra methods accept a `ResolvablePath<T>` argument, which means any of:
+
+- A `Path<T>` or `TemplatePath<T>` instance
+- A lambda `(proxy: T) => unknown` (evaluated once against a proxy)
+- An object with a `segments` property

@@ -130,9 +130,7 @@ describe("Path algebra", () => {
 
 		it("longer prefix than path returns null", () => {
 			const short = path((p: { a: { b: string } }) => p.a.b);
-			const long = path(
-				(p: { a: { b: { c: { d: string } } } }) => p.a.b.c.d,
-			);
+			const long = path((p: { a: { b: { c: { d: string } } } }) => p.a.b.c.d);
 			expect(short.subtract(long)).toBeNull();
 		});
 

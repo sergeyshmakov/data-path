@@ -1,0 +1,73 @@
+---
+title: Quick Start
+description: A complete working example using data-path.
+---
+
+This page shows the four core operations: create a path, use it as a string, read data through it, and write data through it.
+
+## 1. Create a path
+
+Pass a lambda that navigates the object structure. The proxy records the property accesses; no data is involved yet.
+
+```ts
+import { path } from "data-path";
+
+type User = {
+  profile: { firstName: string; lastName: string };
+  tags: string[];
+};
+
+const firstNamePath = path((u: User) => u.profile.firstName);
+```
+
+Use annotation form `path((u: User) => ...)` — TypeScript infers both `T` and `V` from the parameter annotation.
+
+## 2. Use as a string
+
+```ts
+firstNamePath.$         // "profile.firstName"
+firstNamePath.segments  // ["profile", "firstName"]
+firstNamePath.length    // 2
+```
+
+`.$ ` is the primary string representation. It uses dot notation, with numeric segments for array indices (`"users.0.name"`).
+
+## 3. Read data
+
+```ts
+const user: User = {
+  profile: { firstName: "Alice", lastName: "Smith" },
+  tags: ["admin"],
+};
+
+firstNamePath.get(user)  // "Alice"
+```
+
+`.get()` traverses each segment safely — if any intermediate is `null` or `undefined`, it returns `undefined` rather than throwing.
+
+## 4. Write data
+
+```ts
+const updated = firstNamePath.set(user, "Bob");
+
+updated.profile.firstName  // "Bob"
+user.profile.firstName     // "Alice" — original unchanged
+```
+
+`.set()` returns a structural clone with the value updated at the path. Every intermediate object along the path is also cloned; everything else is shared.
+
+## Accessor shorthand
+
+`.fn` is a stable `(data: T) => V | undefined` function reference, suitable for `.map()` and similar:
+
+```ts
+const users: User[] = [user1, user2, user3];
+const names = users.map(firstNamePath.fn);  // string[]
+```
+
+## What's next
+
+- [Data access](/data-path/guides/data-access/) — `update`, `fn`, and safe traversal details
+- [Templates](/data-path/guides/templates/) — bulk reads and writes with `each` and `deep`
+- [Path algebra](/data-path/guides/path-algebra/) — compose and decompose paths
+- [Integrations](/data-path/integrations/react-hook-form/) — ready-made patterns for React Hook Form, Zustand, and more

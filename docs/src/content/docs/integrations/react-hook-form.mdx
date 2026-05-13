@@ -1,0 +1,117 @@
+---
+title: React Hook Form
+description: Type-safe field names for register, watch, setValue, and useFieldArray.
+---
+
+React Hook Form identifies fields by dot-notation strings (`"users.0.profile.firstName"`). These strings are used in `register`, `watch`, `getValues`, `setValue`, and `setError`. Without a typed path, renaming a property in your form schema silently breaks all the string references.
+
+`data-path` gives you a typed, autocompleted source of truth for every field name.
+
+## Basic usage
+
+```tsx
+import { useForm } from "react-hook-form";
+import { path } from "data-path";
+
+type FormValues = {
+  profile: { firstName: string; lastName: string };
+  email: string;
+};
+
+const firstNamePath = path((f: FormValues) => f.profile.firstName);
+const emailPath = path((f: FormValues) => f.email);
+
+function ProfileForm() {
+  const { register, handleSubmit } = useForm<FormValues>();
+
+  return (
+    <form onSubmit={handleSubmit(console.log)}>
+      <input {...register(firstNamePath.$)} />
+      <input {...register(emailPath.$)} />
+      <button type="submit">Save</button>
+    </form>
+  );
+}
+```
+
+If `profile.firstName` is renamed in `FormValues`, TypeScript flags the lambda immediately — the error is at the path definition, not scattered across ten `register` calls.
+
+## useFieldArray — runtime indices
+
+`useFieldArray` provides an index for each row. Capture it directly in the lambda:
+
+```tsx
+import { useForm, useFieldArray } from "react-hook-form";
+import { path } from "data-path";
+
+type FormValues = { users: Array<{ firstName: string; email: string }> };
+
+function UsersForm() {
+  const { register, control } = useForm<FormValues>({
+    defaultValues: { users: [{ firstName: "", email: "" }] },
+  });
+  const { fields, append, remove } = useFieldArray({ control, name: "users" });
+
+  return (
+    <form>
+      {fields.map((field, i) => {
+        const firstName = path((f: FormValues) => f.users[i].firstName);
+        const email = path((f: FormValues) => f.users[i].email);
+
+        return (
+          <div key={field.id}>
+            <input {...register(firstName.$)} placeholder="First name" />
+            <input {...register(email.$)} placeholder="Email" />
+            <button type="button" onClick={() => remove(i)}>Remove</button>
+          </div>
+        );
+      })}
+      <button type="button" onClick={() => append({ firstName: "", email: "" })}>
+        Add user
+      </button>
+    </form>
+  );
+}
+```
+
+Because the lambda executes once at creation time, `i` is captured at the moment the path is created — each iteration produces a distinct path (`"users.0.firstName"`, `"users.1.firstName"`, etc.).
+
+## watch and setValue
+
+```tsx
+const { watch, setValue } = useForm<FormValues>();
+
+// watch a specific field
+const firstName = watch(firstNamePath.$);
+
+// programmatic write
+setValue(firstNamePath.$, "Alice");
+```
+
+## Reusable field components
+
+Accept a typed `Path` as a prop so the component is self-documenting and type-checked:
+
+```tsx
+import type { Path } from "data-path";
+
+interface FieldProps<T> {
+  label: string;
+  fieldPath: Path<T, string>;
+  register: UseFormRegister<T>;
+}
+
+function TextField<T>({ label, fieldPath, register }: FieldProps<T>) {
+  return (
+    <label>
+      {label}
+      <input {...register(fieldPath.$)} />
+    </label>
+  );
+}
+```
+
+## See also
+
+- [Runtime Variables](/data-path/guides/runtime-variables/) — how lambdas capture loop indices
+- [Data access](/data-path/guides/data-access/) — `get`, `set`, `update` for non-form use cases
