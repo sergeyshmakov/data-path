@@ -62,8 +62,7 @@ export abstract class AbstractPathImpl<T = unknown, V = unknown> {
 			otherSegs.length > this.segments.length
 		)
 			return { relation: "parent" };
-		if (patternMatches(this.segments, otherSegs))
-			return { relation: "covers" };
+		if (patternMatches(this.segments, otherSegs)) return { relation: "covers" };
 		if (patternMatches(otherSegs, this.segments))
 			return { relation: "covered-by" };
 		return null;
