@@ -1,10 +1,5 @@
 import { DEEP_WILDCARD, WILDCARD } from "../constants.js";
-import type {
-	MatchResult,
-	Path,
-	ResolvablePath,
-	Segment,
-} from "../types.js";
+import type { MatchResult, Path, ResolvablePath, Segment } from "../types.js";
 import {
 	matchesPrefix,
 	patternMatches,

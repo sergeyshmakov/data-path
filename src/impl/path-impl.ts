@@ -9,11 +9,7 @@ import type {
 	TraversablePathMethods,
 } from "../types.js";
 import { createPathProxy, resolveSegments, segmentsEqual } from "../utils.js";
-import {
-	AbstractPathImpl,
-	DEEP_WILDCARD,
-	WILDCARD,
-} from "./base-path-impl.js";
+import { AbstractPathImpl, DEEP_WILDCARD, WILDCARD } from "./base-path-impl.js";
 
 // ---------------------------------------------------------------------------
 // PathImpl — concrete path with no wildcards
@@ -131,10 +127,10 @@ export class PathImpl<T = unknown, V = unknown>
 
 	to<U>(relative: ResolvablePath<V, U>): Path<T, U> {
 		const tail = resolveSegments(relative);
-		return makeConcrete<T, U>([
-			...this.segments,
-			...tail,
-		]) as unknown as Path<T, U>;
+		return makeConcrete<T, U>([...this.segments, ...tail]) as unknown as Path<
+			T,
+			U
+		>;
 	}
 
 	merge<U>(other: ResolvablePath<T, U>): Path<T, U> {
@@ -148,10 +144,10 @@ export class PathImpl<T = unknown, V = unknown>
 // TemplatePathImpl — path containing * or ** wildcards
 // ---------------------------------------------------------------------------
 
-export class TemplatePathImpl<T = unknown, V = unknown> extends AbstractPathImpl<
-	T,
-	V
-> {
+export class TemplatePathImpl<
+	T = unknown,
+	V = unknown,
+> extends AbstractPathImpl<T, V> {
 	// fn returns V[] (not V|undefined) — no covariance conflict since we don't
 	// extend PathImpl; the declared type here matches TemplatePath<T,V>.fn.
 	readonly fn: (data: T) => V[];
