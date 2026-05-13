@@ -1,14 +1,12 @@
-import sitemap from "@astrojs/sitemap";
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 
 const REPO_URL = "https://github.com/sergeyshmakov/data-path";
 
 export default defineConfig({
-	site: "https://sergeyshmakov.github.io",
+	site: "https://sergeyshmakov.github.io/data-path",
 	base: "/data-path",
 	integrations: [
-		sitemap(),
 		starlight({
 			title: "data-path",
 			description:
