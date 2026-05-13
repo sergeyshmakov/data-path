@@ -6,3 +6,13 @@ node_modules
 dist
 test-results
 tsconfig.tsbuildinfo
+
+# Claude Code local data and personal overrides
+.claude/memory/
+.claude/*.local.json
+.claude/*.local.md
+.claude/settings.json
+.claude/rules/
+
+# OpenWolf agent local state
+.wolf/
