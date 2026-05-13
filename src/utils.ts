@@ -18,15 +18,18 @@ export function resolveSegments(
 ): readonly Segment[] {
 	if (typeof target === "function") {
 		const proxy = createPathProxy([]);
-		const result = target(proxy) as any;
-		return result?.[PATH_SEGMENTS] ?? [];
+		const result = target(proxy) as unknown;
+		return (
+			((result as Record<symbol, unknown>)?.[PATH_SEGMENTS] as Segment[]) ?? []
+		);
 	}
-	if (target && typeof target === "object" && "segments" in target) {
-		return target.segments;
+	if (target != null && typeof target === "object" && "segments" in target) {
+		return (target as { segments: readonly Segment[] }).segments;
 	}
 	return [];
 }
 
+// Returns `any` intentionally — the proxy is typed by the caller via PathExpression<T, V>
 export function createPathProxy(segments: readonly Segment[]): any {
 	return new Proxy(
 		{ [PATH_SEGMENTS]: segments },
@@ -34,11 +37,11 @@ export function createPathProxy(segments: readonly Segment[]): any {
 			get(target, key) {
 				if (key === PATH_SEGMENTS)
 					return target[PATH_SEGMENTS as keyof typeof target];
-				if (typeof key === "string" && key !== "Symbol") {
-					const next: Segment = isCanonicalArrayIndex(key) ? Number(key) : key;
-					return createPathProxy([...segments, next]);
-				}
-				return typeof key === "symbol" ? undefined : createPathProxy(segments);
+				// Symbols (other than PATH_SEGMENTS) return undefined — not recordable segments
+				if (typeof key === "symbol") return undefined;
+				// Every string key becomes a new path segment
+				const next: Segment = isCanonicalArrayIndex(key) ? Number(key) : key;
+				return createPathProxy([...segments, next]);
 			},
 		},
 	);

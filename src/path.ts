@@ -1,47 +1,42 @@
 import { PATH_SEGMENTS } from "./constants.js";
-import { PathImpl, setTemplatePathCtor } from "./impl/path-impl.js";
-import { TemplatePathImpl } from "./impl/template-path-impl.js";
+import { PathImpl } from "./impl/path-impl.js";
 import type { BasePath, Path, PathExpression, Segment } from "./types.js";
 import { createPathProxy, isCanonicalArrayIndex } from "./utils.js";
 
-setTemplatePathCtor(TemplatePathImpl);
-
 /**
- * Create a typed path from a lambda expression or extend an existing base path.
- *
- * This function serves as the primary entry point for constructing paths. By utilizing
- * a Proxy-based builder (the lambda expression), it captures property accesses and
- * records them as path segments without needing to evaluate actual data.
+ * Create a typed path from a lambda expression, from an existing base path, or as a root.
  *
  * @example
- * // Create a root path
+ * // Lambda — recommended: annotate the parameter so both T and V are inferred
+ * const p = path((user: User) => user.profile.firstName);
+ *
+ * @example
+ * // Both generics explicit
+ * const p = path<User, string>((u) => u.profile.firstName);
+ *
+ * @example
+ * // Root path (no segments) — typically extended via .to() or path(root, expr)
  * const root = path<User>();
  *
  * @example
- * // Create a path via lambda
- * const p = path<User>((u) => u.address.city);
- *
- * @example
- * // Extend an existing path
+ * // Extend an existing base path
  * const p2 = path(root, (u) => u.profile);
  */
-export function path<T>(): Path<T, T, "">;
-export function path<T, V = unknown>(
-	expr: PathExpression<T, V>,
-): Path<T, V, string>;
+export function path<T>(): Path<T, T>;
+export function path<T, V = unknown>(expr: PathExpression<T, V>): Path<T, V>;
 export function path<T, U, V = unknown>(
-	base: BasePath<T, U, string>,
+	base: BasePath<T, U>,
 	expr: PathExpression<U, V>,
-): Path<T, V, string>;
+): Path<T, V>;
 export function path<T, V = unknown>(
-	baseOrExpr?: BasePath<T, unknown, string> | PathExpression<T, V>,
+	baseOrExpr?: BasePath<T, unknown> | PathExpression<T, V>,
 	expr?:
 		| PathExpression<unknown, V>
 		| { segments: readonly Segment[] }
 		| unknown,
-): Path<T, V, string> {
+): Path<T, V> {
 	if (!baseOrExpr) {
-		return new PathImpl<T, V, string>([]);
+		return new PathImpl<T, V>([]);
 	}
 
 	if (typeof baseOrExpr === "function") {
@@ -49,10 +44,10 @@ export function path<T, V = unknown>(
 		const result = (baseOrExpr as PathExpression<T, V>)(proxy);
 		const segments: Segment[] =
 			((result as Record<symbol, unknown>)?.[PATH_SEGMENTS] as Segment[]) ?? [];
-		return new PathImpl<T, V, string>(segments);
+		return new PathImpl<T, V>(segments);
 	}
 
-	const baseSegments = (baseOrExpr as BasePath<T, unknown, string>).segments;
+	const baseSegments = (baseOrExpr as BasePath<T, unknown>).segments;
 	if (expr) {
 		if (typeof expr === "function") {
 			const proxy = createPathProxy([]);
@@ -60,33 +55,37 @@ export function path<T, V = unknown>(
 			const tailSegments =
 				((result as Record<symbol, unknown>)?.[PATH_SEGMENTS] as Segment[]) ??
 				[];
-			return new PathImpl<T, V, string>([...baseSegments, ...tailSegments]);
-		} else if (typeof expr === "object" && "segments" in expr) {
-			return new PathImpl<T, V, string>([
+			return new PathImpl<T, V>([...baseSegments, ...tailSegments]);
+		}
+		if (typeof expr === "object" && expr !== null && "segments" in expr) {
+			return new PathImpl<T, V>([
 				...baseSegments,
 				...(expr as { segments: readonly Segment[] }).segments,
 			]);
 		}
 	}
 
-	return new PathImpl<T, V, string>(baseSegments as Segment[]);
+	return new PathImpl<T, V>(baseSegments as Segment[]);
 }
 
 /**
- * Create a path from a raw string (e.g., "users.0.name").
+ * Create a path from a raw dot-separated string (e.g. `"users.0.name"`).
  *
- * This is useful when paths are dynamic (like from a database or API response).
- * Type checking on individual segments is bypassed, and segments are automatically
- * parsed into numeric indices where appropriate.
+ * Useful for dynamic paths from external sources (API responses, Zod issue paths, etc.).
+ * Segments that are canonical non-negative integers are stored as numbers; all others as strings.
  *
- * @param raw The dot-separated path string.
- * @returns A Path object representing the given string.
+ * The optional second generic `V` declares the expected leaf type without a cast:
+ * ```ts
+ * unsafePath<User, string>("profile.firstName").get(user)  // string | undefined
+ * ```
+ *
+ * @param raw Dot-separated string. Empty string returns a zero-segment root path.
  */
-export function unsafePath<T>(raw: string): Path<T, unknown, string> {
+export function unsafePath<T, V = unknown>(raw: string): Path<T, V> {
 	const segments: Segment[] = raw
 		? raw
 				.split(".")
 				.map((s) => (s === "" ? s : isCanonicalArrayIndex(s) ? Number(s) : s))
 		: [];
-	return new PathImpl<T, unknown, string>(segments);
+	return new PathImpl<T, V>(segments);
 }

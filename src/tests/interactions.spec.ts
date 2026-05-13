@@ -1,6 +1,5 @@
 /**
  * Runtime tests for .startsWith(), .includes(), .equals(), .match().
- * @see spec/idea.md §5
  */
 
 import { describe, expect, it } from "vitest";
@@ -79,15 +78,25 @@ describe("Path interactions", () => {
 	});
 
 	describe(".match()", () => {
-		it("returns correct relation and params", () => {
+		it("returns correct relation for template vs concrete", () => {
 			const concrete = path((p: R) => p.items[0].name);
 			const template = path((p: R) => p.items).each(
 				(i: { name: string }) => i.name,
 			);
-			const match = template.match(concrete);
-			expect(match).not.toBeNull();
-			expect(match?.relation).toBe("includes");
-			expect(match?.params).toEqual({});
+			const result = template.match(concrete);
+			expect(result).not.toBeNull();
+			expect(result?.relation).toBe("includes");
+		});
+
+		it("result has no params property (removed until named wildcards land)", () => {
+			const concrete = path((p: R) => p.items[0].name);
+			const template = path((p: R) => p.items).each(
+				(i: { name: string }) => i.name,
+			);
+			const result = template.match(concrete);
+			expect(result).not.toBeNull();
+			// params is not part of MatchResult
+			expect("params" in (result ?? {})).toBe(false);
 		});
 
 		it("returns null when comparing two different templates", () => {
@@ -96,6 +105,19 @@ describe("Path interactions", () => {
 				(i) => i.price,
 			);
 			expect(a.match(b)).toBeNull();
+		});
+
+		it("parent / child relations", () => {
+			const parent = path((p: R) => p.items);
+			const child = path((p: R) => p.items[0].name);
+			expect(parent.match(child)?.relation).toBe("parent");
+			expect(child.match(parent)?.relation).toBe("child");
+		});
+
+		it("equals relation", () => {
+			const a = path((p: R) => p.items[0].name);
+			const b = path((p: R) => p.items[0].name);
+			expect(a.match(b)?.relation).toBe("equals");
 		});
 
 		it("immutability: does not mutate original path", () => {
@@ -134,10 +156,8 @@ describe("Path interactions", () => {
 		it("allows comparisons with incompatible root types at compile time due to structural typing", () => {
 			const a = path((p: R) => p.items);
 			const b = path((p: { different: string }) => p.different);
-
-			// No ts-expect-error because BasePath structurally matches { segments: Segment[] }
+			// No ts-expect-error: BasePath structurally matches { segments: Segment[] }
 			a.match(b);
-
 			a.merge(b);
 		});
 	});

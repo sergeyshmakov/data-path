@@ -1,18 +1,21 @@
 /**
  * data-path — typed object property paths
- * @see spec/idea.md
  */
 
 export { path, unsafePath } from "./path.js";
 export type {
-	DeepReachable,
+	BasePath,
+	CollectionItem,
 	MatchRelation,
 	MatchResult,
 	Path,
 	PathConstructor,
 	PathExpression,
+	Primitive,
+	ResolvablePath,
 	ResolvedType,
 	Segment,
 	TemplatePath,
+	TraversablePathMethods,
 	UnsafePathConstructor,
 } from "./types.js";

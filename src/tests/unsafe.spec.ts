@@ -1,6 +1,5 @@
 /**
  * Runtime tests for unsafePath().
- * @see spec/idea.md §2, spec/edge-cases.md §8
  */
 
 import { describe, expect, it } from "vitest";
@@ -47,6 +46,27 @@ describe("unsafePath()", () => {
 			const p = unsafePath<{ address: { city: string } }>("address.city");
 			p.$;
 			expect(p.segments).toEqual(["address", "city"]);
+		});
+	});
+
+	describe("value generic V", () => {
+		it("unsafePath<T, V> narrows get() return to V | undefined", () => {
+			const p = unsafePath<{ name: string }, string>("name");
+			const data = { name: "Alice" };
+			// At runtime, get() returns the value
+			expect(p.get(data)).toBe("Alice");
+		});
+
+		it("unsafePath<T, V>.fn returns (T) => V | undefined", () => {
+			const p = unsafePath<{ count: number }, number>("count");
+			const items = [{ count: 1 }, { count: 2 }, { count: 3 }];
+			expect(items.map(p.fn)).toEqual([1, 2, 3]);
+		});
+
+		it("unsafePath without V defaults to unknown leaf type", () => {
+			const p = unsafePath<{ name: string }>("name");
+			// get() still works at runtime even though type is V|undefined = unknown|undefined
+			expect(p.get({ name: "Alice" })).toBe("Alice");
 		});
 	});
 
