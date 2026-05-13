@@ -4,66 +4,88 @@
 
 | API | Description |
 |-----|-------------|
-| `path<T>()` | Create root path |
-| `path<T>(p => p.a.b)` | Create path from lambda, generic type |
-| `path((p: T) => p.a.b)` | Create path from lambda, infer type |
-| `path(base, p => p.c)` | Extend existing path, `p` must have the output type of `base` |
-| `unsafePath<T>("a.b")` | Create path from raw string, not recommended in usual cases |
+| `path<T>()` | Create root path (no segments) |
+| `path((p: T) => p.a.b)` | Create path from lambda; type inferred from parameter annotation |
+| `path<T, V>(p => p.a.b)` | Create path from lambda; generics explicit |
+| `path(base, p => p.c)` | Extend existing path; `p` is typed as the output type of `base` |
+| `unsafePath<T>("a.b")` | Create path from raw dot-separated string |
 
 ## Properties
 
 | API | Description |
 |-----|-------------|
-| `path.$` | String representation (e.g. `"users.0.name"`) |
-| `path.segments` | Array of segments |
+| `path.$` | Dot-notation string (e.g. `"users.0.name"`) |
+| `path.segments` | Array of string/number segments |
 | `path.length` | Number of segments |
-| `path.fn` | Accessor function for `.map()`, `.filter()` |
+| `path.fn` | Pre-bound accessor — useful with `.map()`, `.filter()` |
 
 ## Data Access
 
 | API | Description |
 |-----|-------------|
-| `path.get(data)` | Read value at path (returns `undefined` if missing) |
-| `path.set(data, value)` | Immutable write, returns new object |
+| `path.get(data)` | Read value; returns `undefined` if any segment is missing |
+| `path.set(data, value)` | Immutable write; returns a new structurally-cloned object |
+| `path.update(data, fn)` | Read-modify-write: `fn` receives current value, returns new value |
 
-## Traversal
+## Navigation
 
 | API | Description |
 |-----|-------------|
-| `path.to(p => p.x)` | Extend path from current value |
-| `path.each(p => p.x)` | Template: match all items in collection |
-| `path.each().to(p => p.x)` | Same as above |
-| `path.deep(node => node.id)` | Template: match property at any depth |
+| `path.parent()` | Returns path without the last segment, or `null` for root/empty |
+| `path.to(relative)` | Extend this path with a relative path rooted at `V` |
+
+`path.to()` accepts a `ResolvablePath<V, U>`: a lambda `(v: V) => U`, a pre-built `Path<V, U>`, or a `{segments}` object.
+
+## Traversal (non-primitive `V` only)
+
+`.each()` and `.deep()` are only available when `V` is not a primitive type.
+
+| API | Description |
+|-----|-------------|
+| `path.each(p => p.x)` | Template: match all items in collection, traverse to `x` (`*` wildcard) |
+| `path.each()` | Template: match all items in collection |
+| `path.deep(node => node.id)` | Template: match property at any nesting depth (`**` wildcard) |
+| `path.deep()` | Template: every descendant node |
 
 ## Manipulation
 
 | API | Description |
 |-----|-------------|
-| `path.merge(other)` | Append path (deduplicates overlap) |
-| `path.subtract(other)` | Remove prefix/suffix, or `null` |
-| `path.slice(start?, end?)` | Slice segments (like `Array.prototype.slice`) |
+| `path.merge(other)` | Append path with smart overlap deduplication |
+| `path.subtract(other)` | Remove prefix; returns remaining tail as `Path<U, V>`, or `null` |
+| `path.slice(start?, end?)` | Slice segments (`Array.prototype.slice` semantics) |
+
+All manipulation methods accept a `ResolvablePath`: lambda, pre-built `Path`, or `{segments}` object.
 
 ## Relational
 
 | API | Description |
 |-----|-------------|
-| `path.startsWith(other)` | True if path is prefix |
-| `path.includes(other)` | True if path contains other |
-| `path.equals(other)` | True if paths are identical |
-| `path.match(other)` | Returns `{ relation, params }` or `null` |
+| `path.startsWith(other)` | `true` if `other` is a prefix of this path |
+| `path.includes(other)` | `true` if this path is a prefix of `other` |
+| `path.equals(other)` | `true` if paths are segment-by-segment identical |
+| `path.match(other)` | Returns `MatchResult` or `null` when unrelated |
+
+All relational methods accept a `ResolvablePath`.
 
 ## Template-only
 
+`TemplatePath` overrides several methods to operate across all wildcard matches:
+
 | API | Description |
 |-----|-------------|
-| `templatePath.expand(data)` | Resolve template to concrete paths |
+| `templatePath.get(data)` | Returns `V[]` — all matched values (not `V \| undefined`) |
+| `templatePath.fn` | Pre-bound accessor returning `V[]` |
+| `templatePath.expand(data)` | Resolve template to concrete `Path<T, V>[]` |
+| `templatePath.to(relative)` | Extend template; returns `TemplatePath<T, U>` |
+| `templatePath.merge(other)` | Append with overlap deduplication; returns `TemplatePath<T, U>` |
 
 ## Match Relations
 
 `path.match(other)` returns `MatchResult` with `relation` one of:
-- `'includes'` — this path contains other
-- `'included-by'` — other contains this path
+- `'includes'` — this path is a prefix of `other`
+- `'included-by'` — `other` is a prefix of this path
 - `'equals'` — paths are identical
-- `'parent'` — this path is parent of other
-- `'child'` — this path is child of other
+- `'parent'` — this path is the direct parent of `other`
+- `'child'` — this path is a direct child of `other`
 - `null` — no relation

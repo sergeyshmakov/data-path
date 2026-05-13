@@ -1,3 +1,4 @@
+import sitemap from "@astrojs/sitemap";
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 
@@ -7,6 +8,7 @@ export default defineConfig({
 	site: "https://sergeyshmakov.github.io",
 	base: "/data-path",
 	integrations: [
+		sitemap(),
 		starlight({
 			title: "data-path",
 			description:
@@ -53,10 +55,7 @@ export default defineConfig({
 				},
 				{
 					label: "Reference",
-					items: [
-						"reference/api-cheatsheet",
-						"reference/types",
-					],
+					items: ["reference/api-cheatsheet", "reference/types"],
 				},
 			],
 		}),
