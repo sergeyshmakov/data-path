@@ -58,9 +58,6 @@
 		"url": "https://github.com/sergeyshmakov/data-path/issues"
 	},
 	"homepage": "https://sergeyshmakov.github.io/data-path/",
-	"lint-staged": {
-		"*.{js,jsx,ts,tsx,json,jsonc,md,mdx,css,yml,yaml}": "biome check --write --no-errors-on-unmatched"
-	},
 	"release": {
 		"branches": [
 			"main"
