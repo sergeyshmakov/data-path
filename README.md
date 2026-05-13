@@ -1,6 +1,6 @@
 # data-path
 
-Type-safe object path builder, accessor, and algebra for TypeScript.
+Type-safe object property paths in TypeScript — build, compare, and manipulate with lambda expressions. Zero dependencies.
 
 [![npm version](https://img.shields.io/npm/v/data-path.svg)](https://www.npmjs.com/package/data-path)
 [![CI](https://github.com/sergeyshmakov/data-path/actions/workflows/pr.yml/badge.svg)](https://github.com/sergeyshmakov/data-path/actions/workflows/pr.yml)
