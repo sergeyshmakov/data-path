@@ -259,20 +259,37 @@ describe("Template paths", () => {
 	});
 
 	describe(".parent() on a template path", () => {
-		it("returns a non-template Path containing the remaining wildcard segments", () => {
+		it("keeps wildcard segments — parent remains a TemplatePath whose .get() expands", () => {
 			const tmpl = path((p: User) => p.items).each((i) => i.name);
-			// segments: ["items", "*", "name"]
+			// segments: ["items", "*", "name"] → parent: ["items", "*"]
 			const parent = tmpl.parent();
 			expect(parent).not.toBeNull();
 			expect(parent?.segments).toEqual(["items", "*"]);
 			expect(parent?.$).toBe("items.*");
+
+			// The critical bug being guarded against: parent must expand `*`,
+			// not treat it as a literal key returning undefined.
+			const data: User = {
+				name: "u",
+				items: [{ name: "a" }, { name: "b" }],
+			};
+			expect(parent?.get(data)).toEqual([{ name: "a" }, { name: "b" }]);
 		});
 
-		it("parent() on a single-segment template returns empty root path", () => {
+		it("returns a concrete Path once the remaining segments contain no wildcards", () => {
 			const tmpl = path((p: User) => p.items).each();
-			// segments: ["items", "*"]  → parent → ["items"]
-			const parent = tmpl.parent()?.parent();
-			expect(parent?.segments).toEqual([]);
+			// segments: ["items", "*"]  → parent → ["items"] (no wildcards left)
+			const parent = tmpl.parent();
+			expect(parent?.segments).toEqual(["items"]);
+
+			const data: User = {
+				name: "u",
+				items: [{ name: "a" }],
+			};
+			expect(parent?.get(data)).toEqual([{ name: "a" }]);
+
+			// One more parent gets us to the empty root path.
+			expect(parent?.parent()?.segments).toEqual([]);
 		});
 
 		it("parent() of a zero-segment path returns null", () => {
@@ -280,6 +297,92 @@ describe("Template paths", () => {
 			// the general guard via a concrete root path
 			const root = path<User>();
 			expect(root.parent()).toBeNull();
+		});
+	});
+
+	describe(".slice() / .subtract() on a template path", () => {
+		it("slice() preserves wildcards and .get() still expands", () => {
+			const tmpl = path((p: User) => p.items).each((i) => i.name);
+			// segments: ["items", "*", "name"]
+			const sliced = tmpl.slice(0, 2);
+			expect(sliced.segments).toEqual(["items", "*"]);
+
+			const data: User = {
+				name: "u",
+				items: [{ name: "a" }, { name: "b" }],
+			};
+			expect(sliced.get(data)).toEqual([{ name: "a" }, { name: "b" }]);
+		});
+
+		it("slice() collapses to a concrete Path when no wildcards remain", () => {
+			const tmpl = path((p: User) => p.items).each((i) => i.name);
+			const sliced = tmpl.slice(0, 1);
+			expect(sliced.segments).toEqual(["items"]);
+
+			const data: User = {
+				name: "u",
+				items: [{ name: "a" }, { name: "b" }],
+			};
+			// One-element array because there's no wildcard — sliced is a concrete Path.
+			expect(sliced.get(data)).toEqual([{ name: "a" }, { name: "b" }]);
+		});
+
+		it("subtract() preserves wildcards in the tail", () => {
+			const tmpl = path((p: User) => p.items).each((i) => i.name);
+			// segments: ["items", "*", "name"]; subtract ["items"]
+			const tail = tmpl.subtract((p: User) => p.items);
+			expect(tail).not.toBeNull();
+			expect(tail?.segments).toEqual(["*", "name"]);
+
+			const item = [{ name: "a" }, { name: "b" }];
+			expect(tail?.get(item)).toEqual(["a", "b"]);
+		});
+	});
+
+	describe(".to() / .merge() on a concrete path with a template argument", () => {
+		it("concrete.to(template) preserves wildcards — .get() expands", () => {
+			interface Root {
+				user: { friends: Array<{ name: string }> };
+			}
+			const userPath = path((r: Root) => r.user);
+			const friendNames = path((u: Root["user"]) => u.friends).each(
+				(f) => f.name,
+			);
+			// Bug guarded against: concrete.to(template) used to build a PathImpl
+			// whose .get() treated '*' as a literal key and returned undefined.
+			const full = userPath.to(friendNames);
+			expect(full.segments).toEqual(["user", "friends", "*", "name"]);
+
+			const data: Root = {
+				user: { friends: [{ name: "alice" }, { name: "bob" }] },
+			};
+			expect(full.get(data)).toEqual(["alice", "bob"]);
+		});
+
+		it("concrete.merge(template) preserves wildcards — .get() expands", () => {
+			interface Root {
+				items: Array<{ name: string }>;
+			}
+			const base = path((r: Root) => r.items);
+			const tmpl = path((r: Root) => r.items).each((i) => i.name);
+			const merged = base.merge(tmpl);
+			// mergeSegments deduplicates "items" overlap → ["items", "*", "name"]
+			expect(merged.segments).toEqual(["items", "*", "name"]);
+
+			const data: Root = { items: [{ name: "a" }, { name: "b" }] };
+			expect(merged.get(data)).toEqual(["a", "b"]);
+		});
+
+		it("concrete.to({segments-with-wildcard}) preserves wildcards", () => {
+			interface Root {
+				items: Array<{ name: string }>;
+			}
+			const base = path((r: Root) => r.items);
+			const full = base.to({ segments: ["*", "name"] });
+			expect(full.segments).toEqual(["items", "*", "name"]);
+
+			const data: Root = { items: [{ name: "a" }] };
+			expect(full.get(data)).toEqual(["a"]);
 		});
 	});
 

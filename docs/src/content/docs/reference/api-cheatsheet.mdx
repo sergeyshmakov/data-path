@@ -39,9 +39,9 @@ On template paths, `.get()` returns `V[]` and `.set()` / `.update()` apply to al
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `.to(lambda \| path)` | `Path<T, U>` | Extend the path to a deeper property |
+| `.to(lambda \| path)` | `Path<T, U> \| TemplatePath<T, U>` | Extend the path. Result is a `TemplatePath` when the `relative` argument carries wildcards; otherwise `Path` |
 | `.parent()` | `Path<T, unknown> \| null` | Remove the last segment; `null` at root |
-| `.merge(other)` | `Path<T, U>` | Overlap-aware concatenation |
+| `.merge(other)` | `Path<T, U> \| TemplatePath<T, U>` | Overlap-aware concatenation. Result is a `TemplatePath` when `other` carries wildcards |
 | `.subtract(prefix)` | `Path<U, V> \| null` | Remove a prefix; `null` if prefix doesn't match |
 | `.slice(start?, end?)` | `Path<T, unknown>` | Slice segments like `Array.prototype.slice` |
 
@@ -57,14 +57,24 @@ On template paths, `.get()` returns `V[]` and `.set()` / `.update()` apply to al
 
 `each` and `deep` are only available when `V` is not a primitive type.
 
-Template paths also support `.to()` and `.merge()` — both return `TemplatePath<T, U>` to preserve expansion.
+Template paths also support `.to()` and `.merge()` — both return `TemplatePath<T, U>` because `this` already carries wildcards.
+
+On a `TemplatePath`, the structural methods are widened to keep wildcards when present:
+
+| Method on `TemplatePath` | Signature |
+|--------------------------|-----------|
+| `.parent()` | `Path<T, unknown> \| TemplatePath<T, unknown> \| null` |
+| `.slice(start?, end?)` | `Path<T, unknown> \| TemplatePath<T, unknown>` |
+| `.subtract(prefix)` | `Path<U, V> \| TemplatePath<U, V> \| null` |
+
+If the resulting segments still contain `*` / `**`, you get a `TemplatePath` (so `.get()` continues to expand matches); otherwise a concrete `Path`. Narrow at the call site if you need to disambiguate.
 
 ## Relational
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `.startsWith(other)` | `boolean` | `true` if this path begins with every segment of `other` |
-| `.includes(other)` | `boolean` | `true` if `other` is a prefix of this path |
+| `.covers(other)` | `boolean` | `true` if this path is a prefix of `other` (this location covers `other` in the data tree) |
 | `.equals(other)` | `boolean` | `true` if both paths have identical segments |
 | `.match(other)` | `MatchResult \| null` | Structural relationship, or `null` if none |
 

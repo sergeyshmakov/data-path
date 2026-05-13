@@ -1,5 +1,5 @@
 /**
- * Runtime tests for .startsWith(), .includes(), .equals(), .match().
+ * Runtime tests for .startsWith(), .covers(), .equals(), .match().
  */
 
 import { describe, expect, it } from "vitest";
@@ -33,21 +33,21 @@ describe("Path interactions", () => {
 		});
 	});
 
-	describe(".includes()", () => {
-		it("template.includes(concrete) returns true when pattern covers path", () => {
+	describe(".covers()", () => {
+		it("template.covers(concrete) returns true when pattern covers path", () => {
 			const concrete = path((p: R) => p.items[0].name);
 			const template = path((p: R) => p.items).each(
 				(i: { name: string }) => i.name,
 			);
-			expect(template.includes(concrete)).toBe(true);
+			expect(template.covers(concrete)).toBe(true);
 		});
 
-		it("concrete.includes(template) returns false", () => {
+		it("concrete.covers(template) returns false", () => {
 			const concrete = path((p: R) => p.items[0].name);
 			const template = path((p: R) => p.items).each(
 				(i: { name: string }) => i.name,
 			);
-			expect(concrete.includes(template)).toBe(false);
+			expect(concrete.covers(template)).toBe(false);
 		});
 
 		it("immutability: does not mutate original path", () => {
@@ -55,7 +55,7 @@ describe("Path interactions", () => {
 			const template = path((p: R) => p.items).each(
 				(i: { name: string }) => i.name,
 			);
-			template.includes(concrete);
+			template.covers(concrete);
 			expect(template.segments).toEqual(["items", "*", "name"]);
 		});
 	});
@@ -85,7 +85,7 @@ describe("Path interactions", () => {
 			);
 			const result = template.match(concrete);
 			expect(result).not.toBeNull();
-			expect(result?.relation).toBe("includes");
+			expect(result?.relation).toBe("covers");
 		});
 
 		it("result has no params property (removed until named wildcards land)", () => {
@@ -130,7 +130,7 @@ describe("Path interactions", () => {
 		});
 	});
 
-	describe("DEEP_WILDCARD (**) in startsWith / includes", () => {
+	describe("DEEP_WILDCARD (**) in startsWith / covers", () => {
 		interface Nested {
 			tree: { a: { b: string } };
 		}
@@ -142,10 +142,10 @@ describe("Path interactions", () => {
 			expect(concrete.startsWith(deep)).toBe(true);
 		});
 
-		it("deep_template.includes(concrete) returns true", () => {
+		it("deep_template.covers(concrete) returns true", () => {
 			const concrete = path((p: Nested) => p.tree.a.b);
 			const deep = path((p: Nested) => p.tree).deep();
-			expect(deep.includes(concrete)).toBe(true);
+			expect(deep.covers(concrete)).toBe(true);
 		});
 
 		it("concrete.startsWith(deep with suffix) returns true when ** skips intermediate segments", () => {
@@ -180,7 +180,7 @@ describe("Path interactions", () => {
 			const b = path((p: { other: string }) => p.other);
 
 			expect(a.startsWith(b as any)).toBe(false);
-			expect(a.includes(b as any)).toBe(false);
+			expect(a.covers(b as any)).toBe(false);
 			expect(a.equals(b as any)).toBe(false);
 			expect(a.match(b as any)).toBeNull();
 		});
@@ -190,7 +190,7 @@ describe("Path interactions", () => {
 		it("handles null/undefined gracefully without throwing", () => {
 			const a = path((p: R) => p.items);
 			expect(() => a.startsWith(null as any)).not.toThrow();
-			expect(() => a.includes(undefined as any)).not.toThrow();
+			expect(() => a.covers(undefined as any)).not.toThrow();
 			expect(() => a.equals({} as any)).not.toThrow();
 			expect(() => a.match(123 as any)).not.toThrow();
 		});

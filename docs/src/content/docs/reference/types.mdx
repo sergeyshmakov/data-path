@@ -16,7 +16,7 @@ function register<T>(fieldPath: Path<T, string>, value: string) {
 }
 ```
 
-`Path<T, V>` conditionally includes `.each()` and `.deep()` — they are only present when `V` is not a primitive type (`string`, `number`, `boolean`, `bigint`, `symbol`). This prevents calling `.each()` on a path that resolves to a leaf value.
+`Path<T, V>` conditionally includes `.each()` and `.deep()` — they are only present when `V` is not a primitive type. The full primitive set is `string | number | boolean | bigint | symbol | null | undefined`. This prevents calling `.each()` on a path that resolves to a leaf value, including paths whose resolved type is `null` or `undefined` (e.g. optional fields, nullable leaves).
 
 ```ts
 const namePath = path((u: User) => u.profile.name);   // V = string (primitive)
@@ -106,14 +106,21 @@ const segments: Segment[] = ["profile", "tags", 0];
 
 ## MatchResult
 
-The return type of `.match()`:
+`.match(other)` returns `MatchResult | null` — a non-null result when the paths are structurally related, or `null` when they are unrelated (no shared prefix and no wildcard match). Always guard for `null` at the call site:
 
 ```ts
 import type { MatchResult } from "data-path";
 
 type MatchResult = {
-  relation: "equals" | "parent" | "child" | "includes" | "included-by";
+  relation: "equals" | "parent" | "child" | "covers" | "covered-by";
 };
+
+const result = namePath.match(otherPath);
+if (result === null) {
+  // paths are unrelated
+} else {
+  switch (result.relation) { /* ... */ }
+}
 ```
 
 | Relation | Meaning |
@@ -121,8 +128,9 @@ type MatchResult = {
 | `"equals"` | Both paths are identical |
 | `"parent"` | `this` is a prefix of `other` |
 | `"child"` | `other` is a prefix of `this` |
-| `"includes"` | `this` contains a wildcard matching `other` |
-| `"included-by"` | `other` contains a wildcard matching `this` |
+| `"covers"` | `this` contains a wildcard matching `other` |
+| `"covered-by"` | `other` contains a wildcard matching `this` |
+| `null` (return value, not a relation) | `this` and `other` share no prefix and no wildcard relationship |
 
 ## ResolvablePath\<T, V\>
 

@@ -1,5 +1,11 @@
 import { DEEP_WILDCARD, WILDCARD } from "../constants.js";
-import type { MatchResult, Path, ResolvablePath, Segment } from "../types.js";
+import type {
+	MatchResult,
+	Path,
+	ResolvablePath,
+	Segment,
+	TemplatePath,
+} from "../types.js";
 import {
 	matchesPrefix,
 	patternMatches,
@@ -35,7 +41,7 @@ export abstract class AbstractPathImpl<T = unknown, V = unknown> {
 		return matchesPrefix(this.segments, resolveSegments(other));
 	}
 
-	includes(other: ResolvablePath<T>): boolean {
+	covers(other: ResolvablePath<T>): boolean {
 		return matchesPrefix(resolveSegments(other), this.segments);
 	}
 
@@ -57,16 +63,23 @@ export abstract class AbstractPathImpl<T = unknown, V = unknown> {
 		)
 			return { relation: "parent" };
 		if (patternMatches(this.segments, otherSegs))
-			return { relation: "includes" };
+			return { relation: "covers" };
 		if (patternMatches(otherSegs, this.segments))
-			return { relation: "included-by" };
+			return { relation: "covered-by" };
 		return null;
 	}
 
-	// Abstract — implementations create PathImpl instances which live in path-impl.ts
-	abstract parent(): Path<T, unknown> | null;
-	abstract subtract<U>(prefix: ResolvablePath<T, U>): Path<U, V> | null;
-	abstract slice(start?: number, end?: number): Path<T, unknown>;
+	// Abstract — implementations create PathImpl or TemplatePathImpl instances which live in path-impl.ts.
+	// TemplatePathImpl widens these to also allow returning a TemplatePath when the resulting
+	// segments still contain wildcards.
+	abstract parent(): Path<T, unknown> | TemplatePath<T, unknown> | null;
+	abstract subtract<U>(
+		prefix: ResolvablePath<T, U>,
+	): Path<U, V> | TemplatePath<U, V> | null;
+	abstract slice(
+		start?: number,
+		end?: number,
+	): Path<T, unknown> | TemplatePath<T, unknown>;
 }
 
 // Re-export constants used by both PathImpl and TemplatePathImpl so callers

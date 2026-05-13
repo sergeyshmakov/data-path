@@ -5,11 +5,15 @@ description: Map ZodError.issues paths to typed field paths for form error displ
 
 When a Zod schema fails validation, `ZodError.issues` contains an array of error objects. Each issue has a `path` property — an array of string and number segments (e.g. `["user", "age"]`). Mapping those segments to specific form fields requires comparing them to known field paths. `data-path` makes that comparison typed and refactor-safe.
 
+:::note
+Don't round-trip Zod segments through `join(".")` + `unsafePath()`. A schema key that contains a literal `.` (e.g. `z.object({ "user.email": ... })`) gets split by `unsafePath` and resolves to the wrong path. Pass the segments array directly — every method that takes a path also accepts `{ segments }`.
+:::
+
 ## Basic mapping
 
 ```ts
 import { z } from "zod";
-import { path, unsafePath } from "data-path";
+import { path } from "data-path";
 
 const schema = z.object({
   user: z.object({
@@ -27,13 +31,11 @@ const result = schema.safeParse({ user: { age: 15, email: "bad" } });
 
 if (!result.success) {
   for (const issue of result.error.issues) {
-    // Convert the Zod segments array to a data-path path
-    const errorPath = unsafePath<FormData>(issue.path.join("."));
-
-    if (errorPath.equals(agePath)) {
+    // Compare the Zod segments array directly — no string round-trip.
+    if (agePath.equals({ segments: issue.path })) {
       console.log("Age error:", issue.message);
     }
-    if (errorPath.equals(emailPath)) {
+    if (emailPath.equals({ segments: issue.path })) {
       console.log("Email error:", issue.message);
     }
   }
@@ -42,14 +44,14 @@ if (!result.success) {
 
 ## Building a field error map
 
-Convert all issues at once into a map keyed by path string:
+A `Map` keyed by stringified segments avoids the dot-collision hazard of `path.join(".")`:
 
 ```ts
 function buildErrorMap(error: z.ZodError): Map<string, string> {
   const map = new Map<string, string>();
   for (const issue of error.issues) {
-    const key = issue.path.join(".");
-    map.set(key, issue.message);
+    // JSON.stringify preserves segment boundaries even when a key contains '.'
+    map.set(JSON.stringify(issue.path), issue.message);
   }
   return map;
 }
@@ -57,11 +59,11 @@ function buildErrorMap(error: z.ZodError): Map<string, string> {
 const errors = buildErrorMap(result.error);
 
 // Look up by typed path
-const ageError = errors.get(agePath.$);    // "Must be at least 18"
-const emailError = errors.get(emailPath.$); // "Invalid email"
+const ageError = errors.get(JSON.stringify(agePath.segments));     // "Must be at least 18"
+const emailError = errors.get(JSON.stringify(emailPath.segments)); // "Invalid email"
 ```
 
-Using `agePath.$` as the lookup key keeps the field name in sync with the schema: if you rename `age` to `birthYear`, the path lambda breaks at compile time, and `agePath.$` updates automatically.
+Using `agePath.segments` as the lookup key keeps the field reference in sync with the schema: if you rename `age` to `birthYear`, the path lambda breaks at compile time, and `agePath.segments` updates automatically.
 
 ## React Hook Form integration
 
@@ -98,14 +100,13 @@ function AgeForm() {
 
 ## Nested and array paths
 
-Zod issue paths for array fields include numeric indices: `["users", 0, "email"]`. Joining with `"."` gives `"users.0.email"`, which matches `data-path`'s numeric segment convention:
+Zod emits numeric indices as real numbers in `issue.path` (e.g. `["users", 0, "email"]`). `data-path` uses the same `string | number` segment convention, so the array matches directly — no string conversion required:
 
 ```ts
 const firstUserEmailPath = path((f: FormData) => f.users[0].email);
 
 // Zod issue: { path: ["users", 0, "email"], message: "..." }
-const errorPath = unsafePath<FormData>(issue.path.join("."));
-errorPath.equals(firstUserEmailPath)  // true
+firstUserEmailPath.equals({ segments: issue.path });  // true
 ```
 
 ## See also

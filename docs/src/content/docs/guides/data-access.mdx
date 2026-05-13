@@ -66,13 +66,15 @@ data.items   // ["a", "b"] — unchanged
 
 ## update
 
-Reads the current value, passes it to the updater, then writes the result. Equivalent to `path.set(data, updater(path.get(data)))`.
+Reads the current value, passes it to the updater, then writes the result.
 
 ```ts
 const incremented = scorePath.update(game, (n) => (n ?? 0) + 1);
 ```
 
 The updater receives `V | undefined` — handle the `undefined` case explicitly when the value might be absent.
+
+On a plain `Path`, this is equivalent to `path.set(data, updater(path.get(data)))`. On a `TemplatePath` the equivalence does **not** hold: `.update` invokes the updater **once per matched item** with that item's value, then writes each result back to its own location. See [Templates](/data-path/guides/templates/) for the per-item form, or use `.set(data, constant)` if you want to broadcast a single value across every match.
 
 ## fn
 

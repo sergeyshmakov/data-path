@@ -74,17 +74,34 @@ const rowMatchesFilter = (row: User, filter: string) =>
 
 ## Path-driven column registry
 
-Build a column registry where path definitions drive both the accessor and the display name:
+Build a column registry where path definitions drive both the accessor and the display name. Use `Path<T, V>` as the prop type, and specialize the helper to your row type (the `ColumnHelper` returned by `createColumnHelper<User>()` is already tied to `User`):
 
 ```ts
-function col<T, V>(p: ReturnType<typeof path<T, V>>, header: string) {
-  return columnHelper.accessor(p.fn as (row: T) => V, { id: p.$, header });
+import type { Path } from "data-path";
+
+function col<V>(p: Path<User, V>, header: string) {
+  return columnHelper.accessor(p.fn, { id: p.$, header });
 }
 
 const columns = [
   col(namePath, "Name"),
   col(emailPath, "Email"),
 ];
+```
+
+If you want a row-type-agnostic helper, pass the `columnHelper` in and make the factory itself generic:
+
+```ts
+import type { ColumnHelper } from "@tanstack/react-table";
+import type { Path } from "data-path";
+
+function makeCol<T>(helper: ColumnHelper<T>) {
+  return <V>(p: Path<T, V>, header: string) =>
+    helper.accessor(p.fn, { id: p.$, header });
+}
+
+const col = makeCol(columnHelper);
+const columns = [col(namePath, "Name"), col(emailPath, "Email")];
 ```
 
 ## See also

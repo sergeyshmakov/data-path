@@ -77,7 +77,7 @@ firstNamePath.fn                       // stable (u: User) => string | undefined
 - [Data access](https://sergeyshmakov.github.io/data-path/guides/data-access/) — `get`, `set`, `update`, `fn`
 - [Templates](https://sergeyshmakov.github.io/data-path/guides/templates/) — `each`, `deep`, bulk writes across collections
 - [Path algebra](https://sergeyshmakov.github.io/data-path/guides/path-algebra/) — `merge`, `subtract`, `slice`, `to`
-- [Relational](https://sergeyshmakov.github.io/data-path/guides/relational/) — `startsWith`, `includes`, `match`
+- [Relational](https://sergeyshmakov.github.io/data-path/guides/relational/) — `startsWith`, `covers`, `match`
 - [Runtime variables](https://sergeyshmakov.github.io/data-path/guides/runtime-variables/) — dynamic indices and closures
 
 ## AI tooling

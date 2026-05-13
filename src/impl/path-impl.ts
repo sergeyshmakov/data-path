@@ -125,19 +125,37 @@ export class PathImpl<T = unknown, V = unknown>
 		]) as unknown as TemplatePath<T, U>;
 	}
 
-	to<U>(relative: ResolvablePath<V, U>): Path<T, U> {
+	to<U>(relative: ResolvablePath<V, U>): Path<T, U> | TemplatePath<T, U> {
 		const tail = resolveSegments(relative);
-		return makeConcrete<T, U>([...this.segments, ...tail]) as unknown as Path<
-			T,
-			U
-		>;
+		return makeFromSegments<T, U>([...this.segments, ...tail]) as unknown as
+			| Path<T, U>
+			| TemplatePath<T, U>;
 	}
 
-	merge<U>(other: ResolvablePath<T, U>): Path<T, U> {
-		return makeConcrete<T, U>(
+	merge<U>(other: ResolvablePath<T, U>): Path<T, U> | TemplatePath<T, U> {
+		return makeFromSegments<T, U>(
 			mergeSegments(this.segments, resolveSegments(other)),
-		) as unknown as Path<T, U>;
+		) as unknown as Path<T, U> | TemplatePath<T, U>;
 	}
+}
+
+/**
+ * Returns a concrete `PathImpl` when `segments` contains no wildcards,
+ * otherwise a `TemplatePathImpl` so `.get()` correctly expands matches.
+ */
+function makeFromSegments<T, V>(
+	segments: readonly Segment[],
+): PathImpl<T, V> | TemplatePathImpl<T, V> {
+	return hasWildcard(segments)
+		? new TemplatePathImpl<T, V>(segments)
+		: new PathImpl<T, V>(segments);
+}
+
+function hasWildcard(segments: readonly Segment[]): boolean {
+	for (const s of segments) {
+		if (s === WILDCARD || s === DEEP_WILDCARD) return true;
+	}
+	return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,25 +204,32 @@ export class TemplatePathImpl<
 		return current;
 	}
 
-	parent(): Path<T, unknown> | null {
+	parent(): Path<T, unknown> | TemplatePath<T, unknown> | null {
 		if (this.segments.length === 0) return null;
-		return makeConcrete<T, unknown>(
+		return makeFromSegments<T, unknown>(
 			this.segments.slice(0, -1),
-		) as unknown as Path<T, unknown>;
+		) as unknown as Path<T, unknown> | TemplatePath<T, unknown>;
 	}
 
-	subtract<U>(prefix: ResolvablePath<T, U>): Path<U, V> | null {
+	subtract<U>(
+		prefix: ResolvablePath<T, U>,
+	): Path<U, V> | TemplatePath<U, V> | null {
 		const a = this.segments;
 		const b = resolveSegments(prefix);
 		if (b.length > a.length) return null;
 		if (!segmentsEqual(a.slice(0, b.length), b)) return null;
-		return makeConcrete<U, V>(a.slice(b.length)) as unknown as Path<U, V>;
+		return makeFromSegments<U, V>(a.slice(b.length)) as unknown as
+			| Path<U, V>
+			| TemplatePath<U, V>;
 	}
 
-	slice(start?: number, end?: number): Path<T, unknown> {
-		return makeConcrete<T, unknown>(
+	slice(
+		start?: number,
+		end?: number,
+	): Path<T, unknown> | TemplatePath<T, unknown> {
+		return makeFromSegments<T, unknown>(
 			this.segments.slice(start, end),
-		) as unknown as Path<T, unknown>;
+		) as unknown as Path<T, unknown> | TemplatePath<T, unknown>;
 	}
 
 	each<U = CollectionItem<V>>(

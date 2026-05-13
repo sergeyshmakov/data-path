@@ -9,15 +9,15 @@ export type Segment = string | number;
  * The structural relation returned by `.match()`.
  *
  * Semantics when calling `a.match(b)`:
- * - `"parent"`    — `a` is a prefix of `b`   (a is the parent, b is deeper)
- * - `"child"`     — `b` is a prefix of `a`   (b is the parent, a is deeper)
- * - `"equals"`    — `a` and `b` are identical
- * - `"includes"`  — `a` (with wildcards) covers `b` as a concrete match
- * - `"included-by"` — `b` (with wildcards) covers `a` as a concrete match
+ * - `"parent"`     — `a` is a prefix of `b`   (a is the parent, b is deeper)
+ * - `"child"`      — `b` is a prefix of `a`   (b is the parent, a is deeper)
+ * - `"equals"`     — `a` and `b` are identical
+ * - `"covers"`     — `a` (with wildcards) covers `b` as a concrete match
+ * - `"covered-by"` — `b` (with wildcards) covers `a` as a concrete match
  */
 export type MatchRelation =
-	| "includes"
-	| "included-by"
+	| "covers"
+	| "covered-by"
 	| "equals"
 	| "parent"
 	| "child";
@@ -180,10 +180,18 @@ export interface BasePath<T = unknown, V = unknown> {
 	startsWith(other: ResolvablePath<T>): boolean;
 
 	/**
-	 * Returns `true` if `other`'s segments begin with all segments of this path
-	 * (i.e. this path is a prefix of `other`). Supports wildcard segments.
+	 * Returns `true` if this path's domain covers `other` — i.e. this path's segments
+	 * are a prefix of `other`'s segments (or match `other` via wildcards). The inverse
+	 * direction of {@link startsWith}.
+	 *
+	 * NOTE: this is NOT analogous to `Array.prototype.includes` / `String.prototype.includes`.
+	 * Think "covers a location in the data tree", not "contains as an element".
+	 *
+	 * @example
+	 * profilePath.covers(namePath)  // true  — "profile" covers "profile.name"
+	 * namePath.covers(profilePath)  // false
 	 */
-	includes(other: ResolvablePath<T>): boolean;
+	covers(other: ResolvablePath<T>): boolean;
 
 	/** Returns `true` if this path is segment-by-segment identical to `other`. */
 	equals(other: ResolvablePath<T>): boolean;
@@ -203,11 +211,15 @@ export interface BasePath<T = unknown, V = unknown> {
 	 * Appends `other` (a T-rooted path) with smart suffix/prefix overlap deduplication.
 	 * When the tail of this path matches the head of `other`, the overlap is collapsed once.
 	 *
+	 * If `other` carries wildcards (`*` / `**`), the result is a `TemplatePath` so the
+	 * appended pattern still expands at `.get()` time; otherwise a concrete `Path`.
+	 * Narrow at the call site if you need to disambiguate.
+	 *
 	 * @example
 	 * const base = path<Root>(r => r.users[0].profile);
 	 * base.merge(r => r.users[0].profile.name)  // "users.0.profile.name" (no duplication)
 	 */
-	merge<U>(other: ResolvablePath<T, U>): Path<T, U>;
+	merge<U>(other: ResolvablePath<T, U>): Path<T, U> | TemplatePath<T, U>;
 
 	/**
 	 * Removes `prefix` from the start of this path and returns the remaining tail.
@@ -234,7 +246,11 @@ export interface BasePath<T = unknown, V = unknown> {
 
 	/**
 	 * Extends this path with a relative path rooted at `V`.
-	 * Accepts a lambda expression, a pre-built `Path<V, U>`, or any `{segments}` object.
+	 * Accepts a lambda expression, a pre-built `Path<V, U>`, a `TemplatePath<V, U>`, or any `{segments}` object.
+	 *
+	 * If `relative` carries wildcards (`*` / `**`), the result is a `TemplatePath` so the
+	 * appended pattern still expands at `.get()` time; otherwise a concrete `Path`.
+	 * Narrow at the call site if you need to disambiguate.
 	 *
 	 * @example
 	 * // Lambda form:
@@ -244,7 +260,7 @@ export interface BasePath<T = unknown, V = unknown> {
 	 * const firstName = path<Employee>(e => e.profile.firstName);
 	 * employeePath.to(firstName)
 	 */
-	to<U>(relative: ResolvablePath<V, U>): Path<T, U>;
+	to<U>(relative: ResolvablePath<V, U>): Path<T, U> | TemplatePath<T, U>;
 }
 
 /**
@@ -270,7 +286,7 @@ export type Path<T = unknown, V = unknown> = BasePath<T, V> &
  */
 export type TemplatePath<T = unknown, V = unknown> = Omit<
 	BasePath<T, V>,
-	"get" | "fn" | "to" | "merge" | "subtract"
+	"get" | "fn" | "to" | "merge" | "subtract" | "parent" | "slice"
 > & {
 	/**
 	 * Returns an array of all values matched by this template.
@@ -312,6 +328,31 @@ export type TemplatePath<T = unknown, V = unknown> = Omit<
 	 * Returns a `TemplatePath` because `this` carries wildcards.
 	 */
 	merge<U>(other: ResolvablePath<T, U>): TemplatePath<T, U>;
+
+	/**
+	 * Returns the parent path (all segments except the last), or `null` for an empty path.
+	 * If the parent still contains wildcards (`*` / `**`) it remains a `TemplatePath`;
+	 * otherwise a concrete `Path` is returned. Narrow at the call site if needed.
+	 */
+	parent(): Path<T, unknown> | TemplatePath<T, unknown> | null;
+
+	/**
+	 * Returns a new path over a slice of segments. If the slice still contains wildcards
+	 * the result is a `TemplatePath`; otherwise a concrete `Path`.
+	 */
+	slice(
+		start?: number,
+		end?: number,
+	): Path<T, unknown> | TemplatePath<T, unknown>;
+
+	/**
+	 * Removes `prefix` from the start of this path and returns the remaining tail.
+	 * If the tail still contains wildcards the result is a `TemplatePath<U, V>`;
+	 * otherwise a concrete `Path<U, V>`. Returns `null` when `prefix` is not a leading segment-sequence.
+	 */
+	subtract<U>(
+		prefix: ResolvablePath<T, U>,
+	): Path<U, V> | TemplatePath<U, V> | null;
 } & ([V] extends [Primitive]
 		? {}
 		: {

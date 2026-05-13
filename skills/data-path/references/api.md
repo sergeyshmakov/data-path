@@ -31,10 +31,10 @@
 
 | API | Description |
 |-----|-------------|
-| `path.parent()` | Returns path without the last segment, or `null` for root/empty |
-| `path.to(relative)` | Extend this path with a relative path rooted at `V` |
+| `path.parent()` | Returns path without the last segment, or `null` for root/empty. On a `TemplatePath`, the return widens to `Path \| TemplatePath \| null` so wildcards are preserved when they remain in the parent. |
+| `path.to(relative)` | Extend this path with a relative path rooted at `V`. Returns `Path<T, U> \| TemplatePath<T, U>` — a `TemplatePath` when `relative` carries `*`/`**`, otherwise a `Path`. |
 
-`path.to()` accepts a `ResolvablePath<V, U>`: a lambda `(v: V) => U`, a pre-built `Path<V, U>`, or a `{segments}` object.
+`path.to()` accepts a `ResolvablePath<V, U>`: a lambda `(v: V) => U`, a pre-built `Path<V, U>` or `TemplatePath<V, U>`, or a `{segments}` object.
 
 ## Traversal (non-primitive `V` only)
 
@@ -51,18 +51,18 @@
 
 | API | Description |
 |-----|-------------|
-| `path.merge(other)` | Append path with smart overlap deduplication |
-| `path.subtract(other)` | Remove prefix; returns remaining tail as `Path<U, V>`, or `null` |
-| `path.slice(start?, end?)` | Slice segments (`Array.prototype.slice` semantics) |
+| `path.merge(other)` | Append path with smart overlap deduplication. Returns `Path<T, U> \| TemplatePath<T, U>` — a `TemplatePath` when `other` carries `*`/`**`. |
+| `path.subtract(other)` | Remove prefix; returns remaining tail as `Path<U, V>`, or `null`. On a `TemplatePath`, return widens to `Path<U, V> \| TemplatePath<U, V> \| null`. |
+| `path.slice(start?, end?)` | Slice segments (`Array.prototype.slice` semantics). On a `TemplatePath`, return widens to `Path<T, unknown> \| TemplatePath<T, unknown>`. |
 
-All manipulation methods accept a `ResolvablePath`: lambda, pre-built `Path`, or `{segments}` object.
+All manipulation methods accept a `ResolvablePath`: lambda, pre-built `Path`/`TemplatePath`, or `{segments}` object.
 
 ## Relational
 
 | API | Description |
 |-----|-------------|
 | `path.startsWith(other)` | `true` if `other` is a prefix of this path |
-| `path.includes(other)` | `true` if this path is a prefix of `other` |
+| `path.covers(other)` | `true` if this path is a prefix of `other` (this location covers `other` in the data tree) |
 | `path.equals(other)` | `true` if paths are segment-by-segment identical |
 | `path.match(other)` | Returns `MatchResult` or `null` when unrelated |
 
@@ -77,14 +77,17 @@ All relational methods accept a `ResolvablePath`.
 | `templatePath.get(data)` | Returns `V[]` — all matched values (not `V \| undefined`) |
 | `templatePath.fn` | Pre-bound accessor returning `V[]` |
 | `templatePath.expand(data)` | Resolve template to concrete `Path<T, V>[]` |
-| `templatePath.to(relative)` | Extend template; returns `TemplatePath<T, U>` |
+| `templatePath.to(relative)` | Extend template; returns `TemplatePath<T, U>` (always — `this` carries wildcards) |
 | `templatePath.merge(other)` | Append with overlap deduplication; returns `TemplatePath<T, U>` |
+| `templatePath.subtract(prefix)` | Remove prefix; returns `Path<U, V> \| TemplatePath<U, V> \| null` — `TemplatePath` if wildcards remain in the tail |
+| `templatePath.parent()` | Returns `Path<T, unknown> \| TemplatePath<T, unknown> \| null` |
+| `templatePath.slice(start?, end?)` | Returns `Path<T, unknown> \| TemplatePath<T, unknown>` |
 
 ## Match Relations
 
 `path.match(other)` returns `MatchResult` with `relation` one of:
-- `'includes'` — this path is a prefix of `other`
-- `'included-by'` — `other` is a prefix of this path
+- `'covers'` — this path is a prefix of `other` (this path's location covers `other`)
+- `'covered-by'` — `other` is a prefix of this path
 - `'equals'` — paths are identical
 - `'parent'` — this path is the direct parent of `other`
 - `'child'` — this path is a direct child of `other`

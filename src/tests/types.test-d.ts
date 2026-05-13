@@ -175,7 +175,10 @@ describe(".to()", () => {
 	it(".to(lambda) appends relative path", () => {
 		const root = path((x: { a: { b: string } }) => x.a);
 		const full = root.to((a) => a.b);
-		expectTypeOf(full).toEqualTypeOf<Path<{ a: { b: string } }, string>>();
+		expectTypeOf(full).toEqualTypeOf<
+			| Path<{ a: { b: string } }, string>
+			| TemplatePath<{ a: { b: string } }, string>
+		>();
 	});
 
 	it(".to(path object) appends a pre-built Path<V, U>", () => {
@@ -185,7 +188,9 @@ describe(".to()", () => {
 		const userPath = path((r: Root) => r.user);
 		const namePath = path((u: User) => u.profile.name);
 		const full = userPath.to(namePath);
-		expectTypeOf(full).toEqualTypeOf<Path<Root, string>>();
+		expectTypeOf(full).toEqualTypeOf<
+			Path<Root, string> | TemplatePath<Root, string>
+		>();
 	});
 
 	it(".each().to(lambda) returns TemplatePath, not Path", () => {
@@ -308,14 +313,14 @@ describe("Generic type preservation", () => {
 		it("preserves T in .to()", () => {
 			const root = path<Wrapper<T>>();
 			const full = root.to((x) => x.value);
-			assertType<Path<Wrapper<T>, T>>(full);
+			assertType<Path<Wrapper<T>, T> | TemplatePath<Wrapper<T>, T>>(full);
 		});
 
 		it("preserves T in .merge()", () => {
 			const root = path<Wrapper<T>>();
 			const tail = path((x: Wrapper<T>) => x.value);
 			const merged = root.merge(tail);
-			assertType<Path<Wrapper<T>, T>>(merged);
+			assertType<Path<Wrapper<T>, T> | TemplatePath<Wrapper<T>, T>>(merged);
 		});
 
 		it("preserves T in .each() templates", () => {

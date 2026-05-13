@@ -90,25 +90,41 @@ setValue(firstNamePath.$, "Alice");
 
 ## Reusable field components
 
-Accept a typed `Path` as a prop so the component is self-documenting and type-checked:
+Accept a typed `Path` as a prop so the component is self-documenting and type-checked. The component must be generic over RHF's `FieldValues` constraint so `UseFormRegister<T>` resolves correctly:
 
 ```tsx
 import type { Path } from "data-path";
+import type { FieldPath, FieldValues, UseFormRegister } from "react-hook-form";
 
-interface FieldProps<T> {
+interface FieldProps<T extends FieldValues> {
   label: string;
   fieldPath: Path<T, string>;
   register: UseFormRegister<T>;
 }
 
-function TextField<T>({ label, fieldPath, register }: FieldProps<T>) {
+function TextField<T extends FieldValues>({
+  label,
+  fieldPath,
+  register,
+}: FieldProps<T>) {
   return (
     <label>
       {label}
-      <input {...register(fieldPath.$)} />
+      {/* fieldPath.$ is a plain string; cast to RHF's literal-typed FieldPath<T>. */}
+      <input {...register(fieldPath.$ as FieldPath<T>)} />
     </label>
   );
 }
+```
+
+Usage:
+
+```tsx
+<TextField
+  label="First name"
+  fieldPath={path((f: FormValues) => f.profile.firstName)}
+  register={register}
+/>
 ```
 
 ## See also

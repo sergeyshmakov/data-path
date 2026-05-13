@@ -1,9 +1,18 @@
 ---
 title: Relational
-description: Compare paths with startsWith, includes, equals, and match.
+description: Compare paths with startsWith, covers, equals, and match.
 ---
 
 Relational methods are useful for permissions checks, validation mapping, and UI logic where you need to know how two paths relate — whether one is a prefix of another, whether they overlap, or what structural relationship they have.
+
+## Mental model
+
+Think of every path as a **location in the data tree**. A shorter path like `profile` covers a wider subtree; a deeper path like `profile.name` points at a specific spot inside that subtree. `startsWith` and `covers` are direction-reversed views of the same containment:
+
+- `deeperPath.startsWith(widerPath)` — does the deeper location *fall under* the wider one?
+- `widerPath.covers(deeperPath)` — does the wider location *contain* the deeper one?
+
+(`covers` is **not** like `Array.prototype.includes`; it asks about data-tree containment, not element membership.)
 
 ## startsWith
 
@@ -23,13 +32,13 @@ profilePath.startsWith(namePath)   // false
 
 The argument can be a `Path`, a lambda, or a `{ segments }` object.
 
-## includes
+## covers
 
-Returns `true` if `other` is a prefix of the path (the inverse of `startsWith`).
+Returns `true` if this path's location covers `other` — i.e. this path is a prefix of `other` (the inverse direction of `startsWith`).
 
 ```ts
-profilePath.includes(namePath)   // true  — "profile" contains "profile.name"
-namePath.includes(profilePath)   // false
+profilePath.covers(namePath)   // true  — "profile" covers "profile.name"
+namePath.covers(profilePath)   // false
 ```
 
 ## Wildcards and direction
@@ -38,7 +47,7 @@ When one path contains wildcards (from `.each()` or `.deep()`), use whichever si
 
 | Called on | Argument | Returns `true` when |
 |-----------|----------|---------------------|
-| template  | `.includes(concrete)` | template's pattern covers the concrete path |
+| template  | `.covers(concrete)` | template's pattern covers the concrete path |
 | concrete  | `.startsWith(template)` | concrete falls under the template prefix |
 
 ```ts
@@ -47,7 +56,7 @@ interface R { items: Array<{ name: string }> }
 const allNames = path((r: R) => r.items).each((i: { name: string }) => i.name);
 const one = path((r: R) => r.items[0].name);
 
-allNames.includes(one)    // true — the template covers this concrete path
+allNames.covers(one)      // true — the template covers this concrete path
 one.startsWith(allNames)  // true — the concrete falls under the template prefix
 ```
 
@@ -62,7 +71,7 @@ const deep = path((r: Root) => r.tree).deep();      // ["tree", "**"]
 const leaf = path((r: Root) => r.tree.a.b.c);       // ["tree", "a", "b", "c"]
 
 leaf.startsWith(deep)   // true — "**" matches "a.b.c"
-deep.includes(leaf)     // true
+deep.covers(leaf)       // true
 ```
 
 ## equals
@@ -83,7 +92,7 @@ Returns a `MatchResult` describing the structural relationship, or `null` if the
 
 ```ts
 type MatchResult = {
-  relation: "equals" | "parent" | "child" | "includes" | "included-by";
+  relation: "equals" | "parent" | "child" | "covers" | "covered-by";
 };
 ```
 
@@ -103,8 +112,8 @@ Relation meanings:
 | `"equals"` | Both paths are identical |
 | `"parent"` | `this` is a prefix of `other` |
 | `"child"` | `other` is a prefix of `this` |
-| `"includes"` | `this` contains a wildcard that matches `other` |
-| `"included-by"` | `other` contains a wildcard that matches `this` |
+| `"covers"` | `this` contains a wildcard that matches `other` |
+| `"covered-by"` | `other` contains a wildcard that matches `this` |
 
 ## Practical example — permission guard
 

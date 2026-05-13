@@ -30,7 +30,7 @@ const useStore = create<StoreState>((set) => ({
 }));
 ```
 
-`path.set(state, value)` returns a structural clone — Zustand's shallow equality detection works correctly without additional configuration.
+`path.set(state, value)` returns a structural clone in which every object on the path is replaced, but every unrelated branch keeps its reference identity. Zustand's default selector equality is `Object.is`, so selectors that pick a subtree you didn't touch see the same reference and skip re-renders; selectors that pick the touched subtree see a new reference and re-render. (Shallow equality via `useShallow` / `useStoreWithEqualityFn` is opt-in and orthogonal — `data-path` doesn't require it.)
 
 ## Compared to manual spreading
 

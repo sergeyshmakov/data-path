@@ -117,15 +117,15 @@ describe("unsafePath()", () => {
 			expect(p.get(data)).toBe("star"); // literal key "*" is found
 		});
 
-		it("unsafePath with '*' segment participates in wildcard matching for startsWith/includes", () => {
+		it("unsafePath with '*' segment participates in wildcard matching for startsWith/covers", () => {
 			// The "*" segment is treated as a wildcard by matchesPrefix / patternMatches,
 			// so relational methods see it as a template.
 			type Data = { items: Array<{ name: string }> };
 			const template = unsafePath<Data>("items.*.name");
 			const concrete = path((p: Data) => p.items[0].name);
-			// template.includes(concrete): matchesPrefix(["items",0,"name"], ["items","*","name"])
+			// template.covers(concrete): matchesPrefix(["items",0,"name"], ["items","*","name"])
 			// "*" matches 0 → true
-			expect(template.includes(concrete)).toBe(true);
+			expect(template.covers(concrete)).toBe(true);
 			expect(concrete.startsWith(template)).toBe(true);
 		});
 	});
