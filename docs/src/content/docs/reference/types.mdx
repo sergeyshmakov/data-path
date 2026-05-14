@@ -107,13 +107,15 @@ const segments: Segment[] = ["profile", "tags", 0];
 Templates created by `.each()` and `.deep()` insert wildcard sentinels into their segment list. The sentinels are unique `Symbol` values (not the strings `"*"` / `"**"`), so legitimate object keys named `"*"` or `"**"` are preserved as literal segments and never reinterpreted as wildcards.
 
 ```ts
-import { path, WILDCARD, DEEP_WILDCARD } from "data-path";
+import { path, unsafePath, WILDCARD } from "data-path";
 
-const tmpl = path<{ items: { id: string }[] }>().items.each();
+type Data = { items: { id: string }[] };
+const tmpl = path((d: Data) => d.items).each();
 tmpl.segments;  // ["items", WILDCARD]  — symbol, not the string "*"
 tmpl.$;         // "items.*"             — renders as "*" in dot-notation
 
-const literal = unsafePath<Record<string, number>>("a.*.b");
+type Bag = { a: Record<string, { b: number }> };
+const literal = unsafePath<Bag, number>("a.*.b");
 literal.segments;  // ["a", "*", "b"]   — pure strings; "*" is a literal key
 literal.get({ a: { "*": { b: 1 }, x: { b: 2 } } });  // 1
 ```
