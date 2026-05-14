@@ -85,18 +85,48 @@ export function matchesPrefix(
 	return p === prefix.length;
 }
 
+/**
+ * Returns `true` iff `pattern` matches `concrete` exactly when wildcards
+ * are expanded:
+ *   - `WILDCARD` (`*`) consumes exactly one segment.
+ *   - `DEEP_WILDCARD` (`**`) consumes zero or more segments.
+ *   - all other segments must be `===` to the corresponding concrete segment.
+ *
+ * Lengths need not match: a single `**` lets the pattern collapse to a
+ * shorter concrete or stretch to a longer one. This is the "covers"
+ * relation used by `.match()` and is broader than `matchesPrefix`, which
+ * only requires the pattern to match a leading slice.
+ */
 export function patternMatches(
 	pattern: readonly Segment[],
 	concrete: readonly Segment[],
 ): boolean {
-	if (pattern.length !== concrete.length) return false;
-	for (let i = 0; i < pattern.length; i++) {
-		if (
-			pattern[i] !== WILDCARD &&
-			pattern[i] !== DEEP_WILDCARD &&
-			pattern[i] !== concrete[i]
-		)
+	function walk(pi: number, ci: number): boolean {
+		if (pi === pattern.length) return ci === concrete.length;
+		const seg = pattern[pi];
+		if (seg === DEEP_WILDCARD) {
+			for (let skip = 0; ci + skip <= concrete.length; skip++) {
+				if (walk(pi + 1, ci + skip)) return true;
+			}
 			return false;
+		}
+		if (ci === concrete.length) return false;
+		if (seg === WILDCARD) return walk(pi + 1, ci + 1);
+		if (seg !== concrete[ci]) return false;
+		return walk(pi + 1, ci + 1);
 	}
-	return true;
+	return walk(0, 0);
 }
+
+function hasWildcardSegment(segments: readonly Segment[]): boolean {
+	for (const s of segments) {
+		if (s === WILDCARD || s === DEEP_WILDCARD) return true;
+	}
+	return false;
+}
+
+/**
+ * Returns `true` iff `segments` contains a wildcard sentinel
+ * (`WILDCARD` or `DEEP_WILDCARD`).
+ */
+export { hasWildcardSegment };

@@ -120,6 +120,40 @@ describe("Path interactions", () => {
 			expect(a.match(b)?.relation).toBe("equals");
 		});
 
+		it("deep template returns 'covers' against a longer concrete (** collapse)", () => {
+			interface Node {
+				value: string;
+				children: Node[];
+			}
+			interface Root {
+				tree: Node;
+			}
+			const deep = path((p: Root) => p.tree).deep((n) => n.value);
+			const deeper = path((p: Root) => p.tree.children[0].value);
+			// Pre-fix bug: returned "parent" because matchesPrefix(other, this)
+			// was true via ** expansion AND otherSegs.length > this.segments.length.
+			expect(deep.match(deeper)?.relation).toBe("covers");
+			expect(deeper.match(deep)?.relation).toBe("covered-by");
+		});
+
+		it("deep template returns 'covers' against a shorter concrete (** collapses to zero)", () => {
+			interface Data {
+				a: { b: string };
+			}
+			const deep = path((p: Data) => p.a).deep((n) => n.b);
+			const shorter = path((p: Data) => p.a.b);
+			// Pre-fix bug: returned null because patternMatches required equal lengths.
+			expect(deep.match(shorter)?.relation).toBe("covers");
+			expect(shorter.match(deep)?.relation).toBe("covered-by");
+		});
+
+		it("single-* template returns 'covers' for an equal-length concrete (unchanged behaviour)", () => {
+			const tmpl = path((p: R) => p.items).each((i) => i.name);
+			const concrete = path((p: R) => p.items[0].name);
+			expect(tmpl.match(concrete)?.relation).toBe("covers");
+			expect(concrete.match(tmpl)?.relation).toBe("covered-by");
+		});
+
 		it("immutability: does not mutate original path", () => {
 			const concrete = path((p: R) => p.items[0].name);
 			const template = path((p: R) => p.items).each(

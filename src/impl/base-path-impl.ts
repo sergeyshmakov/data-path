@@ -7,6 +7,7 @@ import type {
 	TemplatePath,
 } from "../types.js";
 import {
+	hasWildcardSegment,
 	matchesPrefix,
 	patternMatches,
 	resolveSegments,
@@ -56,19 +57,30 @@ export abstract class AbstractPathImpl<T = unknown, V = unknown> {
 	match(other: ResolvablePath<T>): MatchResult | null {
 		const otherSegs = resolveSegments(other);
 		if (segmentsEqual(this.segments, otherSegs)) return { relation: "equals" };
+
+		// Check wildcard coverage BEFORE literal prefix. patternMatches handles
+		// `**` collapsing, so a deep template can fully cover a concrete path of
+		// any length — that's a "covers", not "parent". Order matters: a literal
+		// prefix check that's wildcard-aware (via matchesPrefix) would otherwise
+		// misclassify "a.**.b covers a.x.y.b" as "parent".
+		if (patternMatches(this.segments, otherSegs)) return { relation: "covers" };
+		if (patternMatches(otherSegs, this.segments))
+			return { relation: "covered-by" };
+
+		// Literal parent/child: the shorter side must be wildcard-free, otherwise
+		// it's not a literal prefix.
 		if (
+			!hasWildcardSegment(otherSegs) &&
 			matchesPrefix(this.segments, otherSegs) &&
 			this.segments.length > otherSegs.length
 		)
 			return { relation: "child" };
 		if (
+			!hasWildcardSegment(this.segments) &&
 			matchesPrefix(otherSegs, this.segments) &&
 			otherSegs.length > this.segments.length
 		)
 			return { relation: "parent" };
-		if (patternMatches(this.segments, otherSegs)) return { relation: "covers" };
-		if (patternMatches(otherSegs, this.segments))
-			return { relation: "covered-by" };
 		return null;
 	}
 
