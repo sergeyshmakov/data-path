@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { path } from "../index.js";
+import { path, WILDCARD } from "../index.js";
 
 interface R {
 	items: Array<{ name: string }>;
@@ -56,7 +56,7 @@ describe("Path interactions", () => {
 				(i: { name: string }) => i.name,
 			);
 			template.covers(concrete);
-			expect(template.segments).toEqual(["items", "*", "name"]);
+			expect(template.segments).toEqual(["items", WILDCARD, "name"]);
 		});
 	});
 
@@ -126,7 +126,7 @@ describe("Path interactions", () => {
 				(i: { name: string }) => i.name,
 			);
 			template.match(concrete);
-			expect(template.segments).toEqual(["items", "*", "name"]);
+			expect(template.segments).toEqual(["items", WILDCARD, "name"]);
 		});
 	});
 
@@ -171,6 +171,29 @@ describe("Path interactions", () => {
 			const concrete = path((p: N2) => p.foo.bar);
 			const deep = path((p: N2) => p.foo).deep((n) => n.baz);
 			expect(concrete.startsWith(deep)).toBe(false);
+		});
+
+		it("** can skip zero segments: pattern 'a.**.b' covers 'a.b'", () => {
+			// Regression for the length-guard bug: deep wildcards represent
+			// zero-or-more segments, so a pattern with `**` must still match
+			// when the concrete path is shorter than the pattern.
+			interface Data {
+				a: { b: string };
+			}
+			const deep = path((p: Data) => p.a).deep((n) => n.b);
+			// pattern: ["a", **, "b"]   concrete: ["a", "b"]
+			const concrete = path((p: Data) => p.a.b);
+			expect(deep.covers(concrete)).toBe(true);
+			expect(concrete.startsWith(deep)).toBe(true);
+		});
+
+		it("** can skip zero segments mid-pattern: 'a.**.b.c' covers 'a.b.c'", () => {
+			interface Data {
+				a: { b: { c: string } };
+			}
+			const deep = path((p: Data) => p.a).deep((n) => n.b.c);
+			const concrete = path((p: Data) => p.a.b.c);
+			expect(deep.covers(concrete)).toBe(true);
 		});
 	});
 

@@ -34,7 +34,11 @@ export abstract class AbstractPathImpl<T = unknown, V = unknown> {
 	}
 
 	toString(): string {
-		return this.segments.join(".");
+		return this.segments
+			.map((s) =>
+				s === WILDCARD ? "*" : s === DEEP_WILDCARD ? "**" : String(s),
+			)
+			.join(".");
 	}
 
 	startsWith(other: ResolvablePath<T>): boolean {

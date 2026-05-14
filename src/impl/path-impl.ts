@@ -30,7 +30,7 @@ export class PathImpl<T = unknown, V = unknown>
 		let current: unknown = data;
 		for (const seg of this.segments) {
 			if (current == null) return undefined;
-			current = (current as Record<string | number, unknown>)[seg];
+			current = (current as Record<PropertyKey, unknown>)[seg];
 		}
 		return current as V | undefined;
 	}
@@ -53,7 +53,7 @@ export class PathImpl<T = unknown, V = unknown>
 				return { ...(obj as object), [key]: val };
 			}
 			const [first, ...rest] = segs;
-			const baseObj = obj as Record<string | number, unknown>;
+			const baseObj = obj as Record<PropertyKey, unknown>;
 			const next = baseObj[first];
 			const nextCopy =
 				next != null && typeof next === "object"
@@ -126,39 +126,28 @@ export class PathImpl<T = unknown, V = unknown>
 	}
 
 	to<U>(relative: ResolvablePath<V, U>): Path<T, U> | TemplatePath<T, U> {
-		const tail = resolveSegments(relative);
-		const combined = [...this.segments, ...tail];
-		if (relative instanceof TemplatePathImpl) {
-			return new TemplatePathImpl<T, U>(combined) as unknown as TemplatePath<
-				T,
-				U
-			>;
-		}
-		return new PathImpl<T, U>(combined) as unknown as Path<T, U>;
+		return makeFromSegments<T, U>([
+			...this.segments,
+			...resolveSegments(relative),
+		]) as unknown as Path<T, U> | TemplatePath<T, U>;
 	}
 
 	merge<U>(other: ResolvablePath<T, U>): Path<T, U> | TemplatePath<T, U> {
-		const merged = mergeSegments(this.segments, resolveSegments(other));
-		if (other instanceof TemplatePathImpl) {
-			return new TemplatePathImpl<T, U>(merged) as unknown as TemplatePath<
-				T,
-				U
-			>;
-		}
-		return new PathImpl<T, U>(merged) as unknown as Path<T, U>;
+		return makeFromSegments<T, U>(
+			mergeSegments(this.segments, resolveSegments(other)),
+		) as unknown as Path<T, U> | TemplatePath<T, U>;
 	}
 }
 
 /**
- * Returns a concrete `PathImpl` when `segments` contains no wildcards,
- * otherwise a `TemplatePathImpl` so `.get()` correctly expands matches.
+ * Returns a concrete `PathImpl` when `segments` contains no wildcard
+ * sentinels, otherwise a `TemplatePathImpl` so `.get()` correctly expands
+ * matches.
  *
- * Only safe to call on segment lists that originate from a template path
- * (e.g. `TemplatePathImpl.parent/slice/subtract`). For composition from
- * concrete sources, template-ness must be derived from the argument's
- * identity (`instanceof TemplatePathImpl`), not from segment content —
- * otherwise legitimate object keys named `"*"` or `"**"` get reinterpreted
- * as wildcards.
+ * Safe by construction: wildcards are unique Symbols (see
+ * {@link WILDCARD} / {@link DEEP_WILDCARD}). Legitimate object keys named
+ * `"*"` or `"**"` are stored as strings and never trigger the template
+ * branch.
  */
 function makeFromSegments<T, V>(
 	segments: readonly Segment[],
@@ -302,7 +291,7 @@ export class TemplatePathImpl<
 						? (Array.from(current.keys()) as number[])
 						: Object.keys(current);
 					for (const key of keys) {
-						walk((current as Record<string | number, unknown>)[key], idx + 1, [
+						walk((current as Record<PropertyKey, unknown>)[key], idx + 1, [
 							...acc,
 							key,
 						]);
@@ -317,7 +306,7 @@ export class TemplatePathImpl<
 						? (Array.from(current.keys()) as number[])
 						: Object.keys(current);
 					for (const key of keys) {
-						walk((current as Record<string | number, unknown>)[key], idx, [
+						walk((current as Record<PropertyKey, unknown>)[key], idx, [
 							...acc,
 							key,
 						]);
@@ -329,7 +318,7 @@ export class TemplatePathImpl<
 					typeof current === "object" &&
 					seg in (current as object)
 				) {
-					walk((current as Record<string | number, unknown>)[seg], idx + 1, [
+					walk((current as Record<PropertyKey, unknown>)[seg], idx + 1, [
 						...acc,
 						seg,
 					]);

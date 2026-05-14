@@ -59,10 +59,16 @@ export function matchesPrefix(
 	full: readonly Segment[],
 	prefix: readonly Segment[],
 ): boolean {
-	if (prefix.length > full.length) return false;
+	// Quick reject: only when prefix is too long even after every `**` collapses
+	// to zero segments. (Each `**` can skip 0..N segments, so each one effectively
+	// subtracts one from the minimum prefix length.)
+	let minPrefixLen = 0;
+	for (const s of prefix) if (s !== DEEP_WILDCARD) minPrefixLen++;
+	if (minPrefixLen > full.length) return false;
+
 	let p = 0;
 	let f = 0;
-	while (p < prefix.length && f < full.length) {
+	while (p < prefix.length) {
 		if (prefix[p] === DEEP_WILDCARD) {
 			if (p === prefix.length - 1) return true;
 			const restPrefix = prefix.slice(p + 1);
@@ -71,6 +77,7 @@ export function matchesPrefix(
 			}
 			return false;
 		}
+		if (f >= full.length) return false;
 		if (prefix[p] !== WILDCARD && prefix[p] !== full[f]) return false;
 		p++;
 		f++;

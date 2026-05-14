@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { path } from "../index.js";
+import { path, WILDCARD } from "../index.js";
 
 interface Store {
 	products: Array<{ list: { activities: Array<{ name: string }> } }>;
@@ -206,7 +206,7 @@ describe("Path algebra", () => {
 			const tail = path((p: { profile: { name: string } }) => p.profile.name);
 			// segments: ["profile", "name"] — overlap "profile" collapses once
 			const merged = tmpl.merge(tail);
-			expect(merged.segments).toEqual(["users", "*", "profile", "name"]);
+			expect(merged.segments).toEqual(["users", WILDCARD, "profile", "name"]);
 			expect(merged.$).toBe("users.*.profile.name");
 			const data: Data = {
 				users: [{ profile: { name: "Alice" } }, { profile: { name: "Bob" } }],
@@ -223,7 +223,7 @@ describe("Path algebra", () => {
 			const tail = path((p: { value: number }) => p.value);
 			// segments: ["value"] — no overlap with "*"
 			const merged = tmpl.merge(tail);
-			expect(merged.segments).toEqual(["items", "*", "value"]);
+			expect(merged.segments).toEqual(["items", WILDCARD, "value"]);
 			const data: Data = { items: [{ value: 1 }, { value: 2 }] };
 			expect(merged.get(data)).toEqual([1, 2]);
 		});

@@ -101,32 +101,43 @@ describe("unsafePath()", () => {
 	});
 
 	describe("wildcard segments", () => {
-		it("'*' in the string becomes a literal segment stored as '*'", () => {
+		it("'*' in the string is stored as the literal string \"*\", NOT the wildcard sentinel", () => {
+			// Wildcards are unique Symbols; unsafePath only produces strings/numbers.
+			// So `"*"` in a dotted string is always a literal segment.
 			const p = unsafePath<object>("a.*.b");
 			expect(p.segments).toEqual(["a", "*", "b"]);
 		});
 
-		it("unsafePath with '*' segment does literal key lookup via .get(), not template expansion", () => {
-			// PathImpl.get() walks segments literally — "*" is looked up as an object key.
-			// To expand wildcards, use path().each() instead of unsafePath.
+		it("unsafePath with '*' does literal key lookup via .get() — no template expansion", () => {
 			type Data = { items: Record<string, { name: string }> };
 			const p = unsafePath<Data, string>("items.*.name");
 			const data: Data = {
 				items: { "*": { name: "star" }, a: { name: "alpha" } },
 			};
-			expect(p.get(data)).toBe("star"); // literal key "*" is found
+			expect(p.get(data)).toBe("star");
 		});
 
-		it("unsafePath with '*' segment participates in wildcard matching for startsWith/covers", () => {
-			// The "*" segment is treated as a wildcard by matchesPrefix / patternMatches,
-			// so relational methods see it as a template.
+		it("unsafePath '*' is NOT wildcard-matched by startsWith/covers (was a bug pre-sentinel)", () => {
+			// Before the sentinel refactor, the SAME path behaved as literal for .get()
+			// but as wildcard for relational methods — a split-personality bug.
+			// After: relational methods compare on segment identity, so literal "*" only
+			// matches another literal "*", not arbitrary keys.
 			type Data = { items: Array<{ name: string }> };
-			const template = unsafePath<Data>("items.*.name");
+			const literal = unsafePath<Data>("items.*.name");
 			const concrete = path((p: Data) => p.items[0].name);
-			// template.covers(concrete): matchesPrefix(["items",0,"name"], ["items","*","name"])
-			// "*" matches 0 → true
+			expect(literal.covers(concrete)).toBe(false);
+			expect(concrete.startsWith(literal)).toBe(false);
+
+			// A real template (built via .each()) still matches:
+			const template = path((p: Data) => p.items).each((i) => i.name);
 			expect(template.covers(concrete)).toBe(true);
 			expect(concrete.startsWith(template)).toBe(true);
+		});
+
+		it("unsafePath '*' segment renders as '*' in .$ for dot-notation compatibility", () => {
+			const p = unsafePath<object>("a.*.b");
+			expect(p.$).toBe("a.*.b");
+			expect(p.toString()).toBe("a.*.b");
 		});
 	});
 });

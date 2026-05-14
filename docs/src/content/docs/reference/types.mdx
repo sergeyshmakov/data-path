@@ -96,13 +96,29 @@ Used as the default value type in `.each()` — `each()` without an argument ret
 
 ## Segment
 
-A single path segment — either a `string` or a `number`:
+A single path segment. Most segments are either a `string` key or a `number` index:
 
 ```ts
 import type { Segment } from "data-path";
 
 const segments: Segment[] = ["profile", "tags", 0];
 ```
+
+Templates created by `.each()` and `.deep()` insert wildcard sentinels into their segment list. The sentinels are unique `Symbol` values (not the strings `"*"` / `"**"`), so legitimate object keys named `"*"` or `"**"` are preserved as literal segments and never reinterpreted as wildcards.
+
+```ts
+import { path, WILDCARD, DEEP_WILDCARD } from "data-path";
+
+const tmpl = path<{ items: { id: string }[] }>().items.each();
+tmpl.segments;  // ["items", WILDCARD]  — symbol, not the string "*"
+tmpl.$;         // "items.*"             — renders as "*" in dot-notation
+
+const literal = unsafePath<Record<string, number>>("a.*.b");
+literal.segments;  // ["a", "*", "b"]   — pure strings; "*" is a literal key
+literal.get({ a: { "*": { b: 1 }, x: { b: 2 } } });  // 1
+```
+
+`WILDCARD` and `DEEP_WILDCARD` are exported when you need to construct a template from a raw segment array (for example, to round-trip through JSON — see [Templates](/data-path/guides/templates/)).
 
 ## MatchResult
 
