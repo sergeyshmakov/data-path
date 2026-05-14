@@ -2,8 +2,24 @@
  * Core type definitions for data-path.
  */
 
-/** A path segment: string key or numeric index */
-export type Segment = string | number;
+import type { DEEP_WILDCARD, WILDCARD } from "./constants.js";
+
+/**
+ * A path segment.
+ *
+ * - `string` — object key
+ * - `number` — array index
+ * - `typeof WILDCARD` — single-level wildcard sentinel (inserted by `.each()`)
+ * - `typeof DEEP_WILDCARD` — deep wildcard sentinel (inserted by `.deep()`)
+ *
+ * The wildcard sentinels are unique Symbols (not the strings `"*"` / `"**"`),
+ * so legitimate object keys named `"*"` or `"**"` are preserved as literal
+ * string segments and never reinterpreted as wildcards by any method.
+ *
+ * The sentinels render as `"*"` / `"**"` in `toString()` / `.$` so dot-notation
+ * output and form-library bindings are unaffected.
+ */
+export type Segment = string | number | typeof WILDCARD | typeof DEEP_WILDCARD;
 
 /**
  * The structural relation returned by `.match()`.

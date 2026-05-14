@@ -39,9 +39,9 @@ On template paths, `.get()` returns `V[]` and `.set()` / `.update()` apply to al
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `.to(lambda \| path)` | `Path<T, U> \| TemplatePath<T, U>` | Extend the path. Result is a `TemplatePath` when the `relative` argument carries wildcards; otherwise `Path` |
+| `.to(lambda \| path)` | `Path<T, U> \| TemplatePath<T, U>` | Extend the path. Result is a `TemplatePath` when `relative` carries wildcard sentinels (built via `.each()`/`.deep()`); otherwise `Path` |
 | `.parent()` | `Path<T, unknown> \| null` | Remove the last segment; `null` at root |
-| `.merge(other)` | `Path<T, U> \| TemplatePath<T, U>` | Overlap-aware concatenation. Result is a `TemplatePath` when `other` carries wildcards |
+| `.merge(other)` | `Path<T, U> \| TemplatePath<T, U>` | Overlap-aware concatenation. Result is a `TemplatePath` when `other` carries wildcard sentinels |
 | `.subtract(prefix)` | `Path<U, V> \| null` | Remove a prefix; `null` if prefix doesn't match |
 | `.slice(start?, end?)` | `Path<T, unknown>` | Slice segments like `Array.prototype.slice` |
 

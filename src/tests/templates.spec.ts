@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { path, unsafePath } from "../index.js";
+import { DEEP_WILDCARD, path, unsafePath, WILDCARD } from "../index.js";
 
 interface User {
 	items: Array<{ name: string }>;
@@ -19,7 +19,7 @@ describe("Template paths", () => {
 		it("outputs single-level wildcard (*) with no arguments", () => {
 			const tmpl = path((p: User) => p.items).each();
 			expect(tmpl.$).toBe("items.*");
-			expect(tmpl.segments).toEqual(["items", "*"]);
+			expect(tmpl.segments).toEqual(["items", WILDCARD]);
 		});
 
 		it("outputs single-level wildcard (*)", () => {
@@ -27,7 +27,7 @@ describe("Template paths", () => {
 				(i: { name: string }) => i.name,
 			);
 			expect(tmpl.$).toBe("items.*.name");
-			expect(tmpl.segments).toEqual(["items", "*", "name"]);
+			expect(tmpl.segments).toEqual(["items", WILDCARD, "name"]);
 		});
 
 		it("path.each().to(lambda) produces same path as path.each(lambda)", () => {
@@ -36,7 +36,7 @@ describe("Template paths", () => {
 				.to((i) => i.name);
 			const viaEach = path((p: User) => p.items).each((i) => i.name);
 			expect(viaTo.$).toBe("items.*.name");
-			expect(viaTo.segments).toEqual(["items", "*", "name"]);
+			expect(viaTo.segments).toEqual(["items", WILDCARD, "name"]);
 			expect(viaTo.$).toBe(viaEach.$);
 			// .to() on a template must preserve wildcard expansion
 			const data: User = {
@@ -68,7 +68,7 @@ describe("Template paths", () => {
 		it("outputs multi-level wildcard (**) with no arguments", () => {
 			const deep = path((p: Tree) => p.tree).deep();
 			expect(deep.$).toBe("tree.**");
-			expect(deep.segments).toEqual(["tree", "**"]);
+			expect(deep.segments).toEqual(["tree", DEEP_WILDCARD]);
 		});
 
 		it("outputs multi-level wildcard (**)", () => {
@@ -76,7 +76,7 @@ describe("Template paths", () => {
 				(n: { label: string }) => n.label,
 			);
 			expect(deep.$).toBe("tree.**.label");
-			expect(deep.segments).toEqual(["tree", "**", "label"]);
+			expect(deep.segments).toEqual(["tree", DEEP_WILDCARD, "label"]);
 		});
 
 		it("immutability: does not mutate original path", () => {
@@ -118,7 +118,7 @@ describe("Template paths", () => {
 				name: "root",
 			};
 			tmpl.expand(data);
-			expect(tmpl.segments).toEqual(["items", "*", "name"]);
+			expect(tmpl.segments).toEqual(["items", WILDCARD, "name"]);
 		});
 
 		it("handles multiple wildcards (*)", () => {
@@ -264,7 +264,7 @@ describe("Template paths", () => {
 			// segments: ["items", "*", "name"] → parent: ["items", "*"]
 			const parent = tmpl.parent();
 			expect(parent).not.toBeNull();
-			expect(parent?.segments).toEqual(["items", "*"]);
+			expect(parent?.segments).toEqual(["items", WILDCARD]);
 			expect(parent?.$).toBe("items.*");
 
 			// The critical bug being guarded against: parent must expand `*`,
@@ -305,7 +305,7 @@ describe("Template paths", () => {
 			const tmpl = path((p: User) => p.items).each((i) => i.name);
 			// segments: ["items", "*", "name"]
 			const sliced = tmpl.slice(0, 2);
-			expect(sliced.segments).toEqual(["items", "*"]);
+			expect(sliced.segments).toEqual(["items", WILDCARD]);
 
 			const data: User = {
 				name: "u",
@@ -332,7 +332,7 @@ describe("Template paths", () => {
 			// segments: ["items", "*", "name"]; subtract ["items"]
 			const tail = tmpl.subtract((p: User) => p.items);
 			expect(tail).not.toBeNull();
-			expect(tail?.segments).toEqual(["*", "name"]);
+			expect(tail?.segments).toEqual([WILDCARD, "name"]);
 
 			const item = [{ name: "a" }, { name: "b" }];
 			expect(tail?.get(item)).toEqual(["a", "b"]);
@@ -351,7 +351,7 @@ describe("Template paths", () => {
 			// Bug guarded against: concrete.to(template) used to build a PathImpl
 			// whose .get() treated '*' as a literal key and returned undefined.
 			const full = userPath.to(friendNames);
-			expect(full.segments).toEqual(["user", "friends", "*", "name"]);
+			expect(full.segments).toEqual(["user", "friends", WILDCARD, "name"]);
 
 			const data: Root = {
 				user: { friends: [{ name: "alice" }, { name: "bob" }] },
@@ -367,7 +367,7 @@ describe("Template paths", () => {
 			const tmpl = path((r: Root) => r.items).each((i) => i.name);
 			const merged = base.merge(tmpl);
 			// mergeSegments deduplicates "items" overlap → ["items", "*", "name"]
-			expect(merged.segments).toEqual(["items", "*", "name"]);
+			expect(merged.segments).toEqual(["items", WILDCARD, "name"]);
 
 			const data: Root = { items: [{ name: "a" }, { name: "b" }] };
 			expect(merged.get(data)).toEqual(["a", "b"]);

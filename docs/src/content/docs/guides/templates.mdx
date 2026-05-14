@@ -5,6 +5,24 @@ description: Bulk reads and writes across arrays and recursive trees using each 
 
 A template path contains one or more wildcards (`*` or `**`). It targets multiple values at once rather than a single leaf. Template paths are created with `.each()` and `.deep()`.
 
+:::note[Wildcards are sentinel symbols, not the strings `"*"`/`"**"`]
+The wildcards inserted by `.each()` and `.deep()` are unique `Symbol` values exported as `WILDCARD` / `DEEP_WILDCARD`. They render as `"*"` / `"**"` in `.toString()` and `.$` for dot-notation compatibility, but they are NOT the same as the literal strings `"*"` and `"**"`.
+
+This matters when your data has a real property named `"*"` (or `"**"`):
+
+```ts
+import { path, unsafePath } from "data-path";
+
+// Literal "*" key — no wildcard semantics:
+unsafePath<{ "*": number }>("*").get({ "*": 1, "**": 2 });   // 1
+
+// Wildcard sentinel — expands to every key:
+path<Record<string, number>>().each().get({ "*": 1, "**": 2 });  // [1, 2]
+```
+
+In short: **the only way to get wildcard expansion is `.each()` / `.deep()`** on a path or template. `unsafePath("a.*.b")`, `{ segments: ["*"] }`, and `(x) => x["*"]` are always literal-key lookups.
+:::
+
 ## each — single-level wildcard
 
 `.each()` appends a `*` wildcard that matches every key of the current collection.

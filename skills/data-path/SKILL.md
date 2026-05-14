@@ -54,8 +54,8 @@ When updating nested state (Zustand, useState):
 When mapping Zod errors to UI fields:
 
 1. Create the expected path: `const agePath = path((p: FormData) => p.user.age)`.
-2. For each `issue` in `result.error.issues`, build a path from `issue.path`: `unsafePath<FormData>(issue.path.join("."))`.
-3. Compare: `if (errorPath.equals(agePath)) { /* show error */ }`.
+2. Pass `issue.path` directly as `{ segments }` (do NOT `join(".")` then `unsafePath` — that loses keys containing literal `.`).
+3. Compare: `if (agePath.equals({ segments: issue.path })) { /* show error */ }`.
 
 ### Workflow 4: Bulk Operations (Templates)
 
@@ -87,6 +87,7 @@ When you need to navigate up or extract a sub-section of a path:
 
 - **Lambda captures at creation time**: Use `path((p: T) => p.users[i].name)` with `i` from the enclosing scope. The path is built once when the lambda runs.
 - **Use `unsafePath` only for raw dot-separated strings from external sources** (API responses, persisted paths, query params). Do NOT use `unsafePath(arr.join("."))` to convert a segment array — `unsafePath` re-splits on `.` and corrupts field names containing a literal `.`. Pass `{segments: arr}` directly to relational/algebra methods, or build a path via `path<T>().to({segments: arr})` if you need a `Path` instance. Prefer `path()` for static structure.
+- **`*` / `**` in `unsafePath` and `{segments}` are literal keys**: Wildcards inserted by `.each()`/`.deep()` are unique `Symbol` sentinels (`WILDCARD` / `DEEP_WILDCARD` exports), not the strings. `unsafePath("a.*.b")`, `{segments: ["*"]}`, and `(x) => x["*"]` all do literal key lookups. The only way to get wildcard expansion is `.each()` / `.deep()` (or constructing `{segments: [WILDCARD]}` explicitly).
 - **`.get()` returns `undefined`** if any intermediate segment is missing; it does not throw.
 - **`.set()` and `.update()` are immutable**: Both return a new object. Use with functional updaters.
 - **`.each()` and `.deep()`** require a non-primitive value at the path; they are not available on paths ending in `string`, `number`, etc.
@@ -109,4 +110,4 @@ For the full API cheatsheet (creation, properties, data access, navigation, trav
 | Zustand          | —                | `set(state => path.set(state, v))` |
 | useState         | —                | `setState(prev => path.update(prev, fn))` |
 | TanStack Table   | `id` in accessor | `accessor: path.fn` |
-| Zod              | —                | `unsafePath(issue.path.join(".")).equals(path)` |
+| Zod              | —                | `path.equals({ segments: issue.path })` |
