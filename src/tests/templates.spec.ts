@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { path } from "../index.js";
+import { path, unsafePath } from "../index.js";
 
 interface User {
 	items: Array<{ name: string }>;
@@ -373,16 +373,51 @@ describe("Template paths", () => {
 			expect(merged.get(data)).toEqual(["a", "b"]);
 		});
 
-		it("concrete.to({segments-with-wildcard}) preserves wildcards", () => {
+		it("concrete.to({segments}) treats '*' as a literal key, not a wildcard", () => {
+			// {segments} is unstructured — we can't tell whether '*' was meant
+			// as a wildcard or a literal property key. Resolve in favour of
+			// the literal so real '*' keys still work; callers who want
+			// wildcards must pass a TemplatePath built via .each()/.deep().
 			interface Root {
-				items: Array<{ name: string }>;
+				items: Record<string, { name: string }>;
 			}
 			const base = path((r: Root) => r.items);
 			const full = base.to({ segments: ["*", "name"] });
 			expect(full.segments).toEqual(["items", "*", "name"]);
 
-			const data: Root = { items: [{ name: "a" }] };
-			expect(full.get(data)).toEqual(["a"]);
+			const data: Root = {
+				items: { "*": { name: "literal-star" }, other: { name: "x" } },
+			};
+			expect(full.get(data)).toBe("literal-star");
+		});
+
+		it("concrete.to(lambda accessing '*' key) treats '*' as literal", () => {
+			interface Root {
+				a: Record<string, number>;
+			}
+			const p = path((r: Root) => r.a).to((x) => x["*"]);
+			const data: Root = { a: { "*": 1, b: 2 } };
+			expect(p.get(data)).toBe(1);
+		});
+
+		it("concrete.to(unsafePath('*')) treats '*' as a literal key", () => {
+			interface Root {
+				a: Record<string, number>;
+			}
+			const p = path((r: Root) => r.a).to(unsafePath<{ "*": number }>("*"));
+			const data: Root = { a: { "*": 1, b: 2 } };
+			expect(p.get(data)).toBe(1);
+		});
+
+		it("concrete.merge(concrete with literal '*') stays concrete", () => {
+			interface Root {
+				a: Record<string, number>;
+			}
+			const head = path((r: Root) => r.a);
+			const tail = path((x: { "*": number }) => x["*"]);
+			const merged = head.merge(tail as never);
+			const data: Root = { a: { "*": 1, b: 2 } };
+			expect(merged.get(data)).toBe(1);
 		});
 	});
 

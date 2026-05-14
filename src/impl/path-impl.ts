@@ -127,21 +127,38 @@ export class PathImpl<T = unknown, V = unknown>
 
 	to<U>(relative: ResolvablePath<V, U>): Path<T, U> | TemplatePath<T, U> {
 		const tail = resolveSegments(relative);
-		return makeFromSegments<T, U>([...this.segments, ...tail]) as unknown as
-			| Path<T, U>
-			| TemplatePath<T, U>;
+		const combined = [...this.segments, ...tail];
+		if (relative instanceof TemplatePathImpl) {
+			return new TemplatePathImpl<T, U>(combined) as unknown as TemplatePath<
+				T,
+				U
+			>;
+		}
+		return new PathImpl<T, U>(combined) as unknown as Path<T, U>;
 	}
 
 	merge<U>(other: ResolvablePath<T, U>): Path<T, U> | TemplatePath<T, U> {
-		return makeFromSegments<T, U>(
-			mergeSegments(this.segments, resolveSegments(other)),
-		) as unknown as Path<T, U> | TemplatePath<T, U>;
+		const merged = mergeSegments(this.segments, resolveSegments(other));
+		if (other instanceof TemplatePathImpl) {
+			return new TemplatePathImpl<T, U>(merged) as unknown as TemplatePath<
+				T,
+				U
+			>;
+		}
+		return new PathImpl<T, U>(merged) as unknown as Path<T, U>;
 	}
 }
 
 /**
  * Returns a concrete `PathImpl` when `segments` contains no wildcards,
  * otherwise a `TemplatePathImpl` so `.get()` correctly expands matches.
+ *
+ * Only safe to call on segment lists that originate from a template path
+ * (e.g. `TemplatePathImpl.parent/slice/subtract`). For composition from
+ * concrete sources, template-ness must be derived from the argument's
+ * identity (`instanceof TemplatePathImpl`), not from segment content —
+ * otherwise legitimate object keys named `"*"` or `"**"` get reinterpreted
+ * as wildcards.
  */
 function makeFromSegments<T, V>(
 	segments: readonly Segment[],
