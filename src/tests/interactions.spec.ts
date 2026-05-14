@@ -154,6 +154,28 @@ describe("Path interactions", () => {
 			expect(concrete.match(tmpl)?.relation).toBe("covered-by");
 		});
 
+		it("template-prefix vs deeper concrete: .match() agrees with .covers() (returns 'covers')", () => {
+			// Regression for codex-bot P2: covers() was true but match() returned
+			// null because patternMatches only handled whole-path matches and the
+			// literal parent/child branch was gated off when wildcards were
+			// present. Now match() and covers() agree on wildcard prefix coverage.
+			const tmplPrefix = path((r: R) => r.items).each();
+			const deeper = path((r: R) => r.items[0].name);
+			expect(tmplPrefix.covers(deeper)).toBe(true);
+			expect(tmplPrefix.match(deeper)?.relation).toBe("covers");
+			expect(deeper.match(tmplPrefix)?.relation).toBe("covered-by");
+		});
+
+		it("deep template-prefix vs deeper concrete returns 'covers' (with ** flexing)", () => {
+			interface Tree {
+				root: { kids: Array<{ value: string }> };
+			}
+			const tmplPrefix = path((r: Tree) => r.root).deep();
+			const deeper = path((r: Tree) => r.root.kids[0].value);
+			expect(tmplPrefix.covers(deeper)).toBe(true);
+			expect(tmplPrefix.match(deeper)?.relation).toBe("covers");
+		});
+
 		it("immutability: does not mutate original path", () => {
 			const concrete = path((p: R) => p.items[0].name);
 			const template = path((p: R) => p.items).each(
