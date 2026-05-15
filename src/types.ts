@@ -1,37 +1,64 @@
 /**
  * Core type definitions for data-path.
- * @see spec/idea.md
  */
 
-/** A path segment: string key or numeric index */
-export type Segment = string | number;
-
-/** Relation returned by .match() */
-export type MatchRelation =
-	| "includes"
-	| "included-by"
-	| "equals"
-	| "parent"
-	| "child"
-	| null;
-
-/** Result of .match() — bidirectional relationship + optional params */
-export interface MatchResult {
-	relation: MatchRelation;
-	params?: Record<string, string>;
-}
-
-/** Resolved type at the end of a path (leaf value type) */
-export type ResolvedType<_T, _P extends string> = unknown; // Simplified for stubs; full impl uses recursive keyof
-
-/** Deep-reachable types for .deep() leaf parameter (enables IDE autocomplete) */
-export type DeepReachable<T> = T;
+import type { DEEP_WILDCARD, WILDCARD } from "./constants.js";
 
 /**
- * Extracts the item type from a collection (Array or Record) so that traversal methods
- * (like `.each()`) know what type of item they are iterating over.
+ * A path segment.
  *
- * @template V The collection type (e.g., `string[]` or `Record<string, number>`)
+ * - `string` — object key
+ * - `number` — array index
+ * - `typeof WILDCARD` — single-level wildcard sentinel (inserted by `.each()`)
+ * - `typeof DEEP_WILDCARD` — deep wildcard sentinel (inserted by `.deep()`)
+ *
+ * The wildcard sentinels are unique Symbols (not the strings `"*"` / `"**"`),
+ * so legitimate object keys named `"*"` or `"**"` are preserved as literal
+ * string segments and never reinterpreted as wildcards by any method.
+ *
+ * The sentinels render as `"*"` / `"**"` in `toString()` / `.$` so dot-notation
+ * output and form-library bindings are unaffected.
+ */
+export type Segment = string | number | typeof WILDCARD | typeof DEEP_WILDCARD;
+
+/**
+ * The structural relation returned by `.match()`.
+ *
+ * Semantics when calling `a.match(b)`:
+ * - `"parent"`     — `a` is a prefix of `b`   (a is the parent, b is deeper)
+ * - `"child"`      — `b` is a prefix of `a`   (b is the parent, a is deeper)
+ * - `"equals"`     — `a` and `b` are identical
+ * - `"covers"`     — `a` (with wildcards) covers `b` as a concrete match
+ * - `"covered-by"` — `b` (with wildcards) covers `a` as a concrete match
+ */
+export type MatchRelation =
+	| "covers"
+	| "covered-by"
+	| "equals"
+	| "parent"
+	| "child";
+
+/** Result of .match() — relation only; params are reserved for named-wildcard support */
+export interface MatchResult {
+	relation: MatchRelation;
+}
+
+/**
+ * Extracts the resolved value type from a path object.
+ *
+ * @example
+ * const agePath = path<User>(p => p.profile.age);
+ * type Age = ResolvedType<typeof agePath>; // number
+ */
+export type ResolvedType<P> = P extends { get(data: any): (infer V)[] }
+	? V // TemplatePath: get() returns V[]
+	: P extends BasePath<any, infer V>
+		? V // Path: get() returns V|undefined
+		: never;
+
+/**
+ * Extracts the item type from a collection (Array or Record).
+ * Used by `.each()` to infer the traversal target.
  */
 export type CollectionItem<V> =
 	V extends ReadonlyArray<infer U>
@@ -40,7 +67,7 @@ export type CollectionItem<V> =
 			? U
 			: unknown;
 
-/** Primitives that cannot have traversal methods called on them */
+/** Primitive types that cannot be traversed — `.each()` and `.deep()` are hidden when V extends Primitive */
 export type Primitive =
 	| string
 	| number
@@ -50,314 +77,318 @@ export type Primitive =
 	| null
 	| undefined;
 
-/** Expression type for path construction — receives proxy, returns any (path is inferred from access) */
+/** Lambda used to build a path — receives a proxy typed as T, infers the path from property access */
 export type PathExpression<T, R = unknown> = (proxy: T) => R;
 
 /**
- * Represents the various forms a path can take when provided as an input argument.
- * This enables API flexibility, allowing methods (like `merge`, `match`, `startsWith`)
- * to accept an existing path object, a raw segments object, or a lambda expression.
- *
- * @template T The root data type.
- * @template V The resolved value type at the end of the path.
+ * Flexible path argument — accepts an existing path, a `{segments}` shape, or a lambda expression.
+ * Used by all methods that accept a path as an argument.
  */
 export type ResolvablePath<T, V = unknown> =
-	| BasePath<T, V, string>
+	| BasePath<T, V>
 	| { segments: readonly Segment[] }
 	| PathExpression<T, V>;
 
 /**
- * Extracted methods for traversing into collections or deep structures.
- * This is separated from `BasePath` so that these methods can be conditionally
- * excluded from the type system when a path points to a primitive value
- * (since primitives cannot be traversed).
+ * Traversal methods — only present when V is not a primitive type.
+ * Conditionally excluded by the Path and TemplatePath types.
  */
 export interface TraversablePathMethods<T, V> {
 	/**
-	 * Traverses into a collection (Array or Record) to operate on each item.
+	 * Traverses into a collection (Array or Record), inserting a `*` wildcard.
+	 * Returns a TemplatePath that matches every item.
 	 *
 	 * @example
-	 * const users = path<Root>().users;
-	 * const userNames = users.each(u => u.name); // Path matches all names
+	 * path<Root>().users.each(u => u.name)  // TemplatePath — all names
+	 * path<Root>().users.each()              // TemplatePath — all items
 	 */
 	each<U = CollectionItem<V>>(
 		expr?: (item: CollectionItem<V>) => U,
-	): TemplatePath<T, U, string>;
+	): TemplatePath<T, U>;
 
 	/**
-	 * Traverses deeply into a structure, matching any nested property.
+	 * Traverses deeply into a structure, inserting a `**` wildcard.
+	 * Returns a TemplatePath that matches the given property at any nesting depth.
 	 *
 	 * @example
-	 * const root = path<Root>();
-	 * const allIds = root.deep(node => node.id); // Path matches any 'id' at any depth
+	 * path<Root>().tree.deep(node => node.id)  // TemplatePath — any nested 'id'
+	 * path<Root>().tree.deep()                 // TemplatePath — every descendant node
 	 */
-	deep<U = DeepReachable<V>>(
-		expr?: (leaf: DeepReachable<V>) => U,
-	): TemplatePath<T, U, string>;
+	deep<U = V>(expr?: (leaf: V) => U): TemplatePath<T, U>;
 }
 
 /**
- * The foundational structure for all path objects (both standard and template paths).
- * Contains common properties and operations including value extraction/mutation,
- * relational algebra (comparisons), and structural manipulation.
+ * The foundational interface shared by both Path and TemplatePath.
  *
- * @template T Root data type the path operates on.
- * @template V The expected value type that the path resolves to.
- * @template _P The string representation of the path (optional/unused in runtime, but useful for type-level strings).
+ * @template T  Root data type the path operates on
+ * @template V  Resolved value type at the end of the path
  */
-export interface BasePath<
-	T = unknown,
-	V = unknown,
-	_P extends string = string,
-> {
-	/**
-	 * The array of segments (string keys or numeric indices) that make up this path.
-	 */
+export interface BasePath<T = unknown, V = unknown> {
+	/** Ordered array of string keys and numeric indices that compose this path. */
 	readonly segments: readonly Segment[];
 
-	/**
-	 * The number of segments in this path.
-	 */
+	/** Number of segments in this path. */
 	readonly length: number;
 
 	/**
-	 * The string representation of the path (e.g. "users.0.name").
-	 * Useful for binding paths to form libraries or UI components.
+	 * Dot-notation string representation (e.g. `"users.0.name"`).
+	 * Convenient for binding paths to form libraries.
 	 *
 	 * @example
-	 * path<Root>().users[0].name.$; // "users.0.name"
+	 * path<Root>(r => r.users[0].name).$  // "users.0.name"
 	 */
-	readonly $: _P;
+	readonly $: string;
 
-	/**
-	 * Returns the string representation of the path (e.g. "users.0.name").
-	 *
-	 * @example
-	 * path<Root>().users[0].name.toString(); // "users.0.name"
-	 */
+	/** Returns the dot-notation string representation. */
 	toString(): string;
 
 	/**
-	 * Extracts the value at this path from the given data object.
-	 * Safely handles missing intermediate properties by returning `undefined` instead of throwing an error.
+	 * Extracts the value at this path from a data object.
+	 * Returns `undefined` — rather than throwing — when any intermediate segment is missing.
 	 *
 	 * @example
-	 * const namePath = path<User>().name;
-	 * const name = namePath.get({ name: "Alice" }); // "Alice"
+	 * path<User>(u => u.profile.name).get(user)  // string | undefined
 	 */
-	get(data: T): V;
+	get(data: T): V | undefined;
 
 	/**
-	 * Returns an accessor function that extracts the value at this path from the given data object.
-	 * Useful for array methods like `.map()` or `.filter()`.
+	 * Pre-bound accessor function. Useful for array higher-order methods.
 	 *
 	 * @example
-	 * const names = users.map(path<User>().name.fn);
+	 * users.map(path<User>(u => u.name).fn)  // string | undefined[]
 	 */
-	readonly fn: (data: T) => V;
+	readonly fn: (data: T) => V | undefined;
 
 	/**
-	 * Sets the value at this path in the given data object, returning a new updated object (immutable).
-	 * If intermediate properties are missing, they are automatically created as objects or arrays
-	 * depending on the segment types (numeric keys become arrays).
+	 * Immutably sets the value at this path, returning a structurally-cloned object.
+	 * Missing intermediates are created automatically:
+	 * numeric next-segment → array, string next-segment → object.
 	 *
 	 * @example
-	 * const namePath = path<User>().name;
-	 * const updatedUser = namePath.set({ name: "Alice" }, "Bob"); // { name: "Bob" }
+	 * path<User>(u => u.name).set(user, "Alice")
 	 */
 	set(data: T, value: V): T;
 
 	/**
-	 * Checks if this path starts with the segments of another path.
+	 * Reads the current value, passes it to `updater`, and writes the result back immutably.
+	 * Combines `.get()` + `.set()` in a single expression.
+	 * On a `TemplatePath`, `updater` is called once per expanded match (per-item transform).
 	 *
 	 * @example
-	 * const a = path<Root>().users[0].name;
-	 * const b = path<Root>().users;
-	 * a.startsWith(b); // true
+	 * namePath.update(user, name => (name ?? "").toUpperCase())
+	 */
+	update(data: T, updater: (current: V | undefined) => V): T;
+
+	/**
+	 * Returns the parent path (all segments except the last), or `null` for a root/empty path.
+	 * Value type becomes `unknown` — use a typed path expression if the parent type is needed.
+	 *
+	 * @example
+	 * path<User>(u => u.profile.name).parent()?.$ // "profile"
+	 * path<User>().parent()                        // null
+	 */
+	parent(): Path<T, unknown> | null;
+
+	/**
+	 * Returns `true` if this path's segments begin with all segments of `other`
+	 * (i.e. `other` is a prefix of `this`). Supports wildcard segments.
 	 */
 	startsWith(other: ResolvablePath<T>): boolean;
 
 	/**
-	 * Checks if this path encompasses the segments of another path (i.e., this path is a prefix of the other).
+	 * Returns `true` if this path's domain covers `other` — i.e. this path's segments
+	 * are a prefix of `other`'s segments (or match `other` via wildcards). The inverse
+	 * direction of {@link startsWith}.
+	 *
+	 * NOTE: this is NOT analogous to `Array.prototype.includes` / `String.prototype.includes`.
+	 * Think "covers a location in the data tree", not "contains as an element".
 	 *
 	 * @example
-	 * const a = path<Root>().users;
-	 * const b = path<Root>().users[0].name;
-	 * a.includes(b); // true
+	 * profilePath.covers(namePath)  // true  — "profile" covers "profile.name"
+	 * namePath.covers(profilePath)  // false
 	 */
-	includes(other: ResolvablePath<T>): boolean;
+	covers(other: ResolvablePath<T>): boolean;
 
-	/**
-	 * Checks if this path is exactly equal to another path.
-	 *
-	 * @example
-	 * const a = path<Root>().users;
-	 * const b = path<Root>().users;
-	 * a.equals(b); // true
-	 */
+	/** Returns `true` if this path is segment-by-segment identical to `other`. */
 	equals(other: ResolvablePath<T>): boolean;
 
 	/**
-	 * Matches this path against another path, returning their relationship.
+	 * Returns the structural relationship between this path and `other`, or `null` when unrelated.
+	 *
+	 * `"parent"` means **this** path is the parent (shorter prefix); `"child"` means **this** is deeper.
 	 *
 	 * @example
-	 * const a = path<Root>().users[0];
-	 * const b = path<Root>().users;
-	 * a.match(b); // { relation: 'child', params: {} }
+	 * profilePath.match(namePath)  // { relation: "parent" }  — profilePath IS the parent
+	 * namePath.match(profilePath)  // { relation: "child" }   — namePath is deeper
 	 */
 	match(other: ResolvablePath<T>): MatchResult | null;
 
 	/**
-	 * Appends another path to the end of this path. If the end of this path matches
-	 * the beginning of the other path, the overlapping segments are intelligently deduplicated.
+	 * Appends `other` (a T-rooted path) with smart suffix/prefix overlap deduplication.
+	 * When the tail of this path matches the head of `other`, the overlap is collapsed once.
+	 *
+	 * If `other` carries wildcards (`*` / `**`), the result is a `TemplatePath` so the
+	 * appended pattern still expands at `.get()` time; otherwise a concrete `Path`.
+	 * Narrow at the call site if you need to disambiguate.
 	 *
 	 * @example
-	 * const base = path<Root>().users;
-	 * const full = base.merge(p => p[0].name); // equivalent to path<Root>().users[0].name
+	 * const base = path<Root>(r => r.users[0].profile);
+	 * base.merge(r => r.users[0].profile.name)  // "users.0.profile.name" (no duplication)
 	 */
-	merge<U>(other: ResolvablePath<T, U>): Path<T, U, string>;
+	merge<U>(other: ResolvablePath<T, U>): Path<T, U> | TemplatePath<T, U>;
 
 	/**
-	 * Removes the segments of another path from either the beginning or the end of this path.
-	 * Returns `null` if the other path is neither a prefix nor a suffix.
+	 * Removes `prefix` from the start of this path and returns the remaining tail.
+	 * Returns `null` when `prefix` is not a leading segment-sequence of this path.
+	 *
+	 * The returned path carries the correct root type (`U` — the type `prefix` resolves to),
+	 * so it can be passed directly to `.to()` or used independently.
 	 *
 	 * @example
-	 * const full = path<Root>().users[0].name;
-	 * const base = path<Root>().users;
-	 * const remainder = full.subtract(base); // equivalent to path()[0].name
+	 * const full   = path<Company>(c => c.departments[0].employees[0].name);
+	 * const prefix = path<Company>(c => c.departments[0]);
+	 * full.subtract(prefix)  // Path<Department, string>
 	 */
-	subtract(other: ResolvablePath<T>): Path<T, V, string> | null;
+	subtract<U>(prefix: ResolvablePath<T, U>): Path<U, V> | null;
 
 	/**
-	 * Returns a new path containing a subset of the segments, similar to Array.prototype.slice.
+	 * Returns a new path over a slice of segments, following `Array.prototype.slice` semantics.
+	 * Value type becomes `unknown` because the type at an arbitrary segment boundary is not statically inferable.
 	 *
 	 * @example
-	 * const full = path<Root>().users[0].name;
-	 * full.slice(0, 1); // equivalent to path<Root>().users
+	 * path<Root>(r => r.users[0].name).slice(0, 2).$  // "users.0"
 	 */
-	slice(start?: number, end?: number): Path<T, unknown, string>;
+	slice(start?: number, end?: number): Path<T, unknown>;
 
 	/**
-	 * Extends the current path using a lambda expression starting from the resolved value.
+	 * Extends this path with a relative path rooted at `V`.
+	 * Accepts a lambda expression, a pre-built `Path<V, U>`, a `TemplatePath<V, U>`, or any `{segments}` object.
+	 *
+	 * If `relative` carries wildcards (`*` / `**`), the result is a `TemplatePath` so the
+	 * appended pattern still expands at `.get()` time; otherwise a concrete `Path`.
+	 * Narrow at the call site if you need to disambiguate.
 	 *
 	 * @example
-	 * const userPath = path<Root>().users[0];
-	 * const namePath = userPath.to(u => u.name);
+	 * // Lambda form:
+	 * employeePath.to(e => e.profile.firstName)
+	 *
+	 * // Pre-built path form (no extra lambda needed):
+	 * const firstName = path<Employee>(e => e.profile.firstName);
+	 * employeePath.to(firstName)
 	 */
-	to<U>(expr: PathExpression<V, U>): Path<T, U, string>;
+	to<U>(relative: ResolvablePath<V, U>): Path<T, U> | TemplatePath<T, U>;
 }
 
 /**
- * Represents a strongly-typed object property path.
+ * A strongly-typed object property path.
+ * `.each()` and `.deep()` are only present when `V` is not a primitive type.
  *
- * This type uses intersection (`&`) to combine the base operations (`BasePath`)
- * with conditional traversal methods (`TraversablePathMethods`). The conditional
- * check `[V] extends [Primitive]` ensures that IDEs will not suggest `.each()` or
- * `.deep()` when the path has resolved to a primitive value (like a string or number).
- *
- * @template T Root data type
- * @template V Resolved value type at path end
- * @template P Path string (e.g. "a.b.c") — literal when inferrable, string when dynamic
+ * @template T  Root data type
+ * @template V  Resolved value type at the end of the path
  */
-export type Path<
-	T = unknown,
-	V = unknown,
-	P extends string = string,
-> = BasePath<T, V, P> &
+export type Path<T = unknown, V = unknown> = BasePath<T, V> &
 	([V] extends [Primitive] ? {} : TraversablePathMethods<T, V>);
 
 /**
- * Represents a path containing wildcards (`*` or `**`), useful for operations on multiple items.
+ * A path that contains wildcards (`*` or `**`), matching multiple values at once.
  *
- * It extends the standard `Path` concept but alters the return types of `.each()` and `.deep()`
- * to return another `TemplatePath` (chaining templates). It also adds the `.expand()` method
- * which can resolve this template against actual data to return an array of concrete `Path`s.
+ * - `.get(data)` returns an array of all matched values.
+ * - `.set(data, value)` immutably sets every match to the same constant.
+ * - `.update(data, fn)` applies a per-item transform to every match.
+ * - `.expand(data)` resolves the template to an array of concrete `Path` objects.
  *
- * **Data Access:** Calling `.get()` on a `TemplatePath` will return an array of all matched values.
- * Calling `.set()` will immutably update all matched paths in the object and return the updated object.
- *
- * @template T Root data type
- * @template V Resolved value type at path end
- * @template P Path string (e.g. "a.*.c")
+ * @template T  Root data type
+ * @template V  Item value type at the end of the template path
  */
-export type TemplatePath<
-	T = unknown,
-	V = unknown,
-	P extends string = string,
-> = (Omit<BasePath<T, V, P>, "get" | "fn"> & {
+export type TemplatePath<T = unknown, V = unknown> = Omit<
+	BasePath<T, V>,
+	"get" | "fn" | "to" | "merge" | "subtract" | "parent" | "slice"
+> & {
 	/**
-	 * Extracts an array of values at this template path from the given data object.
+	 * Returns an array of all values matched by this template.
 	 *
 	 * @example
-	 * const names = path<Root>().users.each().name.get(data); // string[]
+	 * path<Root>().users.each(u => u.name).get(data)  // string[]
 	 */
 	get(data: T): V[];
 
 	/**
-	 * Returns an accessor function that extracts an array of values at this template path from the given data object.
-	 * Useful for array methods like `.map()` or `.filter()`.
+	 * Pre-bound accessor function returning an array of all matched values.
 	 *
 	 * @example
-	 * const allNames = companies.map(path<Company>().departments.each().name.fn);
+	 * companies.map(path<Company>().departments.each(d => d.name).fn)
 	 */
 	readonly fn: (data: T) => V[];
-}) &
-	([V] extends [Primitive]
+
+	/**
+	 * Resolves this template to an array of concrete paths that exist in `data`.
+	 *
+	 * @example
+	 * path<Root>().users.each().name.expand(data)
+	 * // [path<Root>().users[0].name, path<Root>().users[1].name, ...]
+	 */
+	expand(data: T): Path<T, V>[];
+
+	/**
+	 * Extends this template with a relative path rooted at `V`, preserving wildcard expansion.
+	 * Returns a `TemplatePath` so the full chain (including the appended segments) is template-aware.
+	 *
+	 * @example
+	 * path<Root>(r => r.users).each().to(u => u.name)
+	 * // TemplatePath — collects every user's name
+	 */
+	to<U>(relative: ResolvablePath<V, U>): TemplatePath<T, U>;
+
+	/**
+	 * Appends `other` with smart overlap deduplication, preserving wildcard behavior.
+	 * Returns a `TemplatePath` because `this` carries wildcards.
+	 */
+	merge<U>(other: ResolvablePath<T, U>): TemplatePath<T, U>;
+
+	/**
+	 * Returns the parent path (all segments except the last), or `null` for an empty path.
+	 * If the parent still contains wildcards (`*` / `**`) it remains a `TemplatePath`;
+	 * otherwise a concrete `Path` is returned. Narrow at the call site if needed.
+	 */
+	parent(): Path<T, unknown> | TemplatePath<T, unknown> | null;
+
+	/**
+	 * Returns a new path over a slice of segments. If the slice still contains wildcards
+	 * the result is a `TemplatePath`; otherwise a concrete `Path`.
+	 */
+	slice(
+		start?: number,
+		end?: number,
+	): Path<T, unknown> | TemplatePath<T, unknown>;
+
+	/**
+	 * Removes `prefix` from the start of this path and returns the remaining tail.
+	 * If the tail still contains wildcards the result is a `TemplatePath<U, V>`;
+	 * otherwise a concrete `Path<U, V>`. Returns `null` when `prefix` is not a leading segment-sequence.
+	 */
+	subtract<U>(
+		prefix: ResolvablePath<T, U>,
+	): Path<U, V> | TemplatePath<U, V> | null;
+} & ([V] extends [Primitive]
 		? {}
 		: {
-				/**
-				 * Traverses into a collection (Array or Record) to operate on each item, returning a TemplatePath.
-				 *
-				 * @example
-				 * const users = path<Root>().users;
-				 * const userNames = users.each(u => u.name); // TemplatePath matching all names
-				 */
 				each<U = CollectionItem<V>>(
 					expr?: (item: CollectionItem<V>) => U,
-				): TemplatePath<T, U, `${string}.${"*"}.${string}`>;
-
-				/**
-				 * Traverses deeply into a structure, matching any nested property, returning a TemplatePath.
-				 *
-				 * @example
-				 * const root = path<Root>();
-				 * const allIds = root.deep(node => node.id); // TemplatePath matching any 'id' at any depth
-				 */
-				deep<U = DeepReachable<V>>(
-					expr?: (leaf: DeepReachable<V>) => U,
-				): TemplatePath<T, U, `${string}.${"**"}.${string}`>;
-			}) & {
-		/**
-		 * Resolves this template path against actual data to return an array of concrete paths
-		 * that exist in the given data.
-		 *
-		 * Note: Currently, `expand` only supports evaluating a single wildcard (`*` or `**`) per path.
-		 *
-		 * @example
-		 * const template = path<Root>().users.each().name;
-		 * const concretePaths = template.expand(data); // [path<Root>().users[0].name, ...]
-		 */
-		expand(data: T): Path<T, V, string>[];
-	};
+				): TemplatePath<T, U>;
+				deep<U = V>(expr?: (leaf: V) => U): TemplatePath<T, U>;
+			});
 
 /**
- * Constructor overloads for creating paths.
- *
- * This allows the `path()` function to be called in several ways:
- * 1. Without arguments: returns a root path `path<T>()`.
- * 2. With a lambda: returns a path built from the expression `path<T>((p) => p.a.b)`.
- * 3. With a base path and a lambda: allows extending an existing path `path(base, (p) => p.c)`.
+ * The overloaded call signature of the `path()` function.
  */
 export type PathConstructor = {
-	<T>(): Path<T, T, "">;
-	<T, V = unknown>(expr: PathExpression<T, V>): Path<T, V, string>;
+	<T>(): Path<T, T>;
+	<T, V = unknown>(expr: PathExpression<T, V>): Path<T, V>;
 	<T, U, V = unknown>(
-		base: BasePath<T, U, string>,
+		base: BasePath<T, U>,
 		expr: PathExpression<U, V>,
-	): Path<T, V, string>;
+	): Path<T, V>;
 };
 
-/** Unsafe path from string — no type checking on segments */
-export type UnsafePathConstructor = <T>(
-	raw: string,
-) => Path<T, unknown, string>;
+/** Call signature of the `unsafePath()` function */
+export type UnsafePathConstructor = <T, V = unknown>(raw: string) => Path<T, V>;

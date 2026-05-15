@@ -18,15 +18,18 @@ export function resolveSegments(
 ): readonly Segment[] {
 	if (typeof target === "function") {
 		const proxy = createPathProxy([]);
-		const result = target(proxy) as any;
-		return result?.[PATH_SEGMENTS] ?? [];
+		const result = target(proxy) as unknown;
+		return (
+			((result as Record<symbol, unknown>)?.[PATH_SEGMENTS] as Segment[]) ?? []
+		);
 	}
-	if (target && typeof target === "object" && "segments" in target) {
-		return target.segments;
+	if (target != null && typeof target === "object" && "segments" in target) {
+		return (target as { segments: readonly Segment[] }).segments;
 	}
 	return [];
 }
 
+// Returns `any` intentionally — the proxy is typed by the caller via PathExpression<T, V>
 export function createPathProxy(segments: readonly Segment[]): any {
 	return new Proxy(
 		{ [PATH_SEGMENTS]: segments },
@@ -34,11 +37,11 @@ export function createPathProxy(segments: readonly Segment[]): any {
 			get(target, key) {
 				if (key === PATH_SEGMENTS)
 					return target[PATH_SEGMENTS as keyof typeof target];
-				if (typeof key === "string" && key !== "Symbol") {
-					const next: Segment = isCanonicalArrayIndex(key) ? Number(key) : key;
-					return createPathProxy([...segments, next]);
-				}
-				return typeof key === "symbol" ? undefined : createPathProxy(segments);
+				// Symbols (other than PATH_SEGMENTS) return undefined — not recordable segments
+				if (typeof key === "symbol") return undefined;
+				// Every string key becomes a new path segment
+				const next: Segment = isCanonicalArrayIndex(key) ? Number(key) : key;
+				return createPathProxy([...segments, next]);
 			},
 		},
 	);
@@ -56,10 +59,16 @@ export function matchesPrefix(
 	full: readonly Segment[],
 	prefix: readonly Segment[],
 ): boolean {
-	if (prefix.length > full.length) return false;
+	// Quick reject: only when prefix is too long even after every `**` collapses
+	// to zero segments. (Each `**` can skip 0..N segments, so each one effectively
+	// subtracts one from the minimum prefix length.)
+	let minPrefixLen = 0;
+	for (const s of prefix) if (s !== DEEP_WILDCARD) minPrefixLen++;
+	if (minPrefixLen > full.length) return false;
+
 	let p = 0;
 	let f = 0;
-	while (p < prefix.length && f < full.length) {
+	while (p < prefix.length) {
 		if (prefix[p] === DEEP_WILDCARD) {
 			if (p === prefix.length - 1) return true;
 			const restPrefix = prefix.slice(p + 1);
@@ -68,6 +77,7 @@ export function matchesPrefix(
 			}
 			return false;
 		}
+		if (f >= full.length) return false;
 		if (prefix[p] !== WILDCARD && prefix[p] !== full[f]) return false;
 		p++;
 		f++;
@@ -75,18 +85,48 @@ export function matchesPrefix(
 	return p === prefix.length;
 }
 
+/**
+ * Returns `true` iff `pattern` matches `concrete` exactly when wildcards
+ * are expanded:
+ *   - `WILDCARD` (`*`) consumes exactly one segment.
+ *   - `DEEP_WILDCARD` (`**`) consumes zero or more segments.
+ *   - all other segments must be `===` to the corresponding concrete segment.
+ *
+ * Lengths need not match: a single `**` lets the pattern collapse to a
+ * shorter concrete or stretch to a longer one. This is the "covers"
+ * relation used by `.match()` and is broader than `matchesPrefix`, which
+ * only requires the pattern to match a leading slice.
+ */
 export function patternMatches(
 	pattern: readonly Segment[],
 	concrete: readonly Segment[],
 ): boolean {
-	if (pattern.length !== concrete.length) return false;
-	for (let i = 0; i < pattern.length; i++) {
-		if (
-			pattern[i] !== WILDCARD &&
-			pattern[i] !== DEEP_WILDCARD &&
-			pattern[i] !== concrete[i]
-		)
+	function walk(pi: number, ci: number): boolean {
+		if (pi === pattern.length) return ci === concrete.length;
+		const seg = pattern[pi];
+		if (seg === DEEP_WILDCARD) {
+			for (let skip = 0; ci + skip <= concrete.length; skip++) {
+				if (walk(pi + 1, ci + skip)) return true;
+			}
 			return false;
+		}
+		if (ci === concrete.length) return false;
+		if (seg === WILDCARD) return walk(pi + 1, ci + 1);
+		if (seg !== concrete[ci]) return false;
+		return walk(pi + 1, ci + 1);
 	}
-	return true;
+	return walk(0, 0);
 }
+
+function hasWildcardSegment(segments: readonly Segment[]): boolean {
+	for (const s of segments) {
+		if (s === WILDCARD || s === DEEP_WILDCARD) return true;
+	}
+	return false;
+}
+
+/**
+ * Returns `true` iff `segments` contains a wildcard sentinel
+ * (`WILDCARD` or `DEEP_WILDCARD`).
+ */
+export { hasWildcardSegment };

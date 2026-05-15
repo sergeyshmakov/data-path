@@ -1,0 +1,137 @@
+---
+title: Relational
+description: Compare paths with startsWith, covers, equals, and match.
+---
+
+Relational methods are useful for permissions checks, validation mapping, and UI logic where you need to know how two paths relate — whether one is a prefix of another, whether they overlap, or what structural relationship they have.
+
+## Mental model
+
+Think of every path as a **location in the data tree**. A shorter path like `profile` covers a wider subtree; a deeper path like `profile.name` points at a specific spot inside that subtree. `startsWith` and `covers` are direction-reversed views of the same containment:
+
+- `deeperPath.startsWith(widerPath)` — does the deeper location *fall under* the wider one?
+- `widerPath.covers(deeperPath)` — does the wider location *contain* the deeper one?
+
+(`covers` is **not** like `Array.prototype.includes`; it asks about data-tree containment, not element membership.)
+
+## startsWith
+
+Returns `true` if the path begins with every segment of `other`.
+
+```ts
+import { path } from "data-path";
+
+type User = { profile: { name: string; age: number } };
+
+const namePath = path((u: User) => u.profile.name);
+const profilePath = path((u: User) => u.profile);
+
+namePath.startsWith(profilePath)   // true  — "profile.name" starts with "profile"
+profilePath.startsWith(namePath)   // false
+```
+
+The argument can be a `Path`, a lambda, or a `{ segments }` object.
+
+## covers
+
+Returns `true` if this path's location covers `other` — i.e. this path is a prefix of `other` (the inverse direction of `startsWith`).
+
+```ts
+profilePath.covers(namePath)   // true  — "profile" covers "profile.name"
+namePath.covers(profilePath)   // false
+```
+
+## Wildcards and direction
+
+When one path contains wildcards (from `.each()` or `.deep()`), use whichever side reads most naturally:
+
+| Called on | Argument | Returns `true` when |
+|-----------|----------|---------------------|
+| template  | `.covers(concrete)` | template's pattern covers the concrete path |
+| concrete  | `.startsWith(template)` | concrete falls under the template prefix |
+
+```ts
+interface R { items: Array<{ name: string }> }
+
+const allNames = path((r: R) => r.items).each((i: { name: string }) => i.name);
+const one = path((r: R) => r.items[0].name);
+
+allNames.covers(one)      // true — the template covers this concrete path
+one.startsWith(allNames)  // true — the concrete falls under the template prefix
+```
+
+The two are logically equivalent — pick the form that reads naturally for your use case.
+
+For `**` (deep wildcard), any number of intermediate segments can match:
+
+```ts
+interface Root { tree: { a: { b: { c: string } } } }
+
+const deep = path((r: Root) => r.tree).deep();      // ["tree", "**"]
+const leaf = path((r: Root) => r.tree.a.b.c);       // ["tree", "a", "b", "c"]
+
+leaf.startsWith(deep)   // true — "**" matches "a.b.c"
+deep.covers(leaf)       // true
+```
+
+## equals
+
+Returns `true` if both paths have identical segments.
+
+```ts
+const p1 = path((u: User) => u.profile.name);
+const p2 = path((u: User) => u.profile.name);
+
+p1.equals(p2)   // true
+p1.equals(profilePath)   // false
+```
+
+## match
+
+Returns a `MatchResult` describing the structural relationship, or `null` if there is none.
+
+```ts
+type MatchResult = {
+  relation: "equals" | "parent" | "child" | "covers" | "covered-by";
+};
+```
+
+```ts
+namePath.match(profilePath)  // { relation: "child" }   — name is under profile
+profilePath.match(namePath)  // { relation: "parent" }  — profile contains name
+namePath.match(namePath)     // { relation: "equals" }
+
+const unrelated = path((u: User) => u.profile.age);
+namePath.match(unrelated)    // null — no relationship
+```
+
+Relation meanings:
+
+| Relation | Meaning |
+|----------|---------|
+| `"equals"` | Both paths are identical |
+| `"parent"` | `this` is a prefix of `other` |
+| `"child"` | `other` is a prefix of `this` |
+| `"covers"` | `this` contains a wildcard that matches `other` |
+| `"covered-by"` | `other` contains a wildcard that matches `this` |
+
+## Practical example — permission guard
+
+```ts
+type Store = { users: User[]; settings: { theme: string } };
+
+const settingsPath = path((s: Store) => s.settings);
+
+function canWrite(targetPath: Path<Store, unknown>): boolean {
+  // Allow writes only outside the settings subtree
+  return !targetPath.startsWith(settingsPath);
+}
+
+canWrite(path((s: Store) => s.users[0].name))    // true
+canWrite(path((s: Store) => s.settings.theme))   // false
+```
+
+## See also
+
+- [Path Algebra](/data-path/guides/path-algebra/) — `merge`, `subtract`, `slice`
+- [Types](/data-path/reference/types/) — `MatchResult` and `ResolvablePath`

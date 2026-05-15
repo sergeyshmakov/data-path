@@ -1,10 +1,9 @@
 /**
  * Runtime tests for .merge(), .subtract(), .slice().
- * @see spec/idea.md §6, spec/edge-cases.md
  */
 
 import { describe, expect, it } from "vitest";
-import { path } from "../index.js";
+import { path, WILDCARD } from "../index.js";
 
 interface Store {
 	products: Array<{ list: { activities: Array<{ name: string }> } }>;
@@ -97,43 +96,24 @@ describe("Path algebra", () => {
 	});
 
 	describe(".subtract()", () => {
-		it("accepts lambda expressions", () => {
+		it("accepts a lambda prefix expression", () => {
 			const full = path((p: Store) => p.products[0].list.activities[0].name);
 			const result = full.subtract((p) => p.products[0].list);
 			expect(result).not.toBeNull();
 			expect(result?.$).toBe("activities.0.name");
 		});
 
-		it("prefix returns suffix", () => {
+		it("prefix path returns the remaining suffix", () => {
 			const i = 0;
 			const t = 0;
 			const full = path((p: Store) => p.products[i].list.activities[t].name);
-			const root = path((p: Store) => p.products[i].list);
-			const result = full.subtract(root);
+			const prefix = path((p: Store) => p.products[i].list);
+			const result = full.subtract(prefix);
 			expect(result).not.toBeNull();
 			expect(result?.$).toBe("activities.0.name");
 		});
 
-		it("suffix returns prefix", () => {
-			const i = 0;
-			const t = 0;
-			const full = path((p: Store) => p.products[i].list.activities[t].name);
-			const tail = path<{ activities: Array<{ name: string }> }>(
-				(p) => p.activities[t].name,
-			);
-			const result = full.subtract(tail);
-			expect(result).not.toBeNull();
-			expect(result?.$).toBe("products.0.list");
-		});
-
-		it("unrelated path returns null", () => {
-			const full = path((p: { a: { b: { c: { d: string } } } }) => p.a.b.c.d);
-			const x = path((p: { b: { c: string } }) => p.b.c);
-			const result = full.subtract(x);
-			expect(result).toBeNull();
-		});
-
-		it("self returns empty path", () => {
+		it("subtracting the full path returns an empty path", () => {
 			const p = path((x: { a: { b: { c: string } } }) => x.a.b.c);
 			const result = p.subtract(p);
 			expect(result).not.toBeNull();
@@ -141,15 +121,37 @@ describe("Path algebra", () => {
 			expect(result?.$).toBe("");
 		});
 
-		it("a longer path from a shorter path returns null", () => {
+		it("unrelated path returns null", () => {
+			const full = path((p: { a: { b: { c: { d: string } } } }) => p.a.b.c.d);
+			const x = path((p: { b: { c: string } }) => p.b.c);
+			const result = full.subtract(x as any);
+			expect(result).toBeNull();
+		});
+
+		it("longer prefix than path returns null", () => {
 			const short = path((p: { a: { b: string } }) => p.a.b);
 			const long = path((p: { a: { b: { c: { d: string } } } }) => p.a.b.c.d);
 			expect(short.subtract(long)).toBeNull();
 		});
 
+		it("empty prefix returns the full path", () => {
+			const p = path((x: { a: { b: string } }) => x.a.b);
+			const root = path<{ a: { b: string } }>();
+			const result = p.subtract(root);
+			expect(result).not.toBeNull();
+			expect(result?.segments).toEqual(["a", "b"]);
+		});
+
+		it("non-matching prefix (shared root, diverging) returns null", () => {
+			const a = path((p: { a: number }) => p.a);
+			const b = path((p: { b: number }) => p.b);
+			expect(a.subtract(b as any)).toBeNull();
+		});
+
 		it("immutability: returns new instance without mutating original", () => {
 			const original = path((p: { a: { b: { c: string } } }) => p.a.b.c);
-			const subtracted = original.subtract(path((p: { c: string }) => p.c));
+			const prefix = path((p: { a: { b: { c: string } } }) => p.a);
+			const subtracted = original.subtract(prefix);
 			expect(subtracted).not.toBe(original);
 			expect(original.segments).toEqual(["a", "b", "c"]);
 		});
@@ -185,20 +187,6 @@ describe("Path algebra", () => {
 		});
 	});
 
-	describe("not matchable cases", () => {
-		it(".subtract() with completely unrelated path returns null", () => {
-			const a = path((p: { a: number }) => p.a);
-			const b = path((p: { b: number }) => p.b);
-			expect(a.subtract(b as any)).toBeNull();
-		});
-
-		it(".subtract() where subtracted path is longer than original returns null", () => {
-			const a = path((p: { a: { b: number } }) => p.a);
-			const b = path((p: { a: { b: number } }) => p.a.b);
-			expect(a.subtract(b)).toBeNull();
-		});
-	});
-
 	describe("unexpected cases", () => {
 		it(".slice() using NaN, Infinity, or negative infinity", () => {
 			const p = path((x: { a: { b: { c: string } } }) => x.a.b.c);
@@ -208,12 +196,44 @@ describe("Path algebra", () => {
 		});
 	});
 
+	describe("TemplatePath.merge()", () => {
+		it("returns a TemplatePath that preserves wildcard expansion", () => {
+			interface Data {
+				users: Array<{ profile: { name: string } }>;
+			}
+			const tmpl = path((p: Data) => p.users).each((u) => u.profile);
+			// segments: ["users", "*", "profile"]
+			const tail = path((p: { profile: { name: string } }) => p.profile.name);
+			// segments: ["profile", "name"] — overlap "profile" collapses once
+			const merged = tmpl.merge(tail);
+			expect(merged.segments).toEqual(["users", WILDCARD, "profile", "name"]);
+			expect(merged.$).toBe("users.*.profile.name");
+			const data: Data = {
+				users: [{ profile: { name: "Alice" } }, { profile: { name: "Bob" } }],
+			};
+			expect(merged.get(data)).toEqual(["Alice", "Bob"]);
+		});
+
+		it("concatenates when there is no overlap", () => {
+			interface Data {
+				items: Array<{ value: number }>;
+			}
+			const tmpl = path((p: Data) => p.items).each();
+			// segments: ["items", "*"]
+			const tail = path((p: { value: number }) => p.value);
+			// segments: ["value"] — no overlap with "*"
+			const merged = tmpl.merge(tail);
+			expect(merged.segments).toEqual(["items", WILDCARD, "value"]);
+			const data: Data = { items: [{ value: 1 }, { value: 2 }] };
+			expect(merged.get(data)).toEqual([1, 2]);
+		});
+	});
+
 	describe("typing incorrect cases", () => {
-		it("allows .merge() with completely incompatible base at compile time due to structural typing", () => {
+		it("allows .merge() with incompatible base at compile time due to structural typing", () => {
 			const head = path((p: { a: number }) => p.a);
 			const tail = path((p: { b: string }) => p.b);
-
-			// No ts-expect-error because BasePath structurally matches { segments: Segment[] }
+			// No ts-expect-error: BasePath structurally matches { segments: Segment[] }
 			head.merge(tail);
 		});
 	});

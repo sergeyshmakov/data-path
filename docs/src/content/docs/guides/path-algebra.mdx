@@ -1,0 +1,149 @@
+---
+title: Path algebra
+description: Compose and decompose paths with merge, subtract, slice, to, and parent.
+---
+
+Path algebra is useful when building reusable components or functions that work with paths at different levels of a data structure. A component can hold a relative path; its parent supplies the base; `merge` combines them.
+
+Each example below is self-contained — copy any fence and it should compile on its own.
+
+## to — extend a path
+
+Appends a relative path expressed as a lambda or an existing `Path`:
+
+```ts
+import { path } from "data-path";
+
+type User = { profile: { name: string; age: number } };
+
+const profilePath = path((u: User) => u.profile);
+const namePath = profilePath.to((p) => p.name);
+
+namePath.$;  // "profile.name"
+```
+
+You can also pass a pre-built `Path<V, U>`:
+
+```ts
+import { path } from "data-path";
+
+type User = { profile: { name: string } };
+type Profile = User["profile"];
+
+const profilePath = path((u: User) => u.profile);
+const nameRelative = path((p: Profile) => p.name);
+
+const fullName = profilePath.to(nameRelative);  // Path<User, string>
+fullName.$;  // "profile.name"
+```
+
+On a template path, `.to()` returns a template path so expansion is preserved:
+
+```ts
+import { path } from "data-path";
+
+type AppData = { users: Array<{ name: string }> };
+const data: AppData = { users: [{ name: "Alice" }, { name: "Bob" }] };
+
+const allNames = path((u: AppData) => u.users).each().to((u) => u.name);
+allNames.$;          // "users.*.name"
+allNames.get(data);  // ["Alice", "Bob"]
+```
+
+## merge — overlap-aware concatenation
+
+`.merge(other)` appends `other` to the path, deduplicating any suffix/prefix overlap. This is the right tool when two paths were built independently but may share a common junction:
+
+```ts
+import { path } from "data-path";
+
+type Employee = { profile: { name: string } };
+type Company = {
+  departments: Array<{ employees: Employee[] }>;
+};
+
+const employeePath = path((c: Company) => c.departments[0].employees[5]);
+const nameSub = path((e: Employee) => e.profile.name);
+
+const full = employeePath.merge(nameSub);
+full.$;  // "departments.0.employees.5.profile.name"
+```
+
+If the tail of the first path matches the head of the second, the overlap is removed. The algorithm finds the **longest** suffix of `this` that equals a prefix of `other` and joins at that point:
+
+```ts
+import { path } from "data-path";
+
+type Tree = { a: { b: { c: { d: string } } }; b: { c: { d: string } } };
+
+const a = path((x: Tree) => x.a.b.c);
+const b = path((x: Tree) => x.b.c.d);
+
+a.merge(b).$;  // "a.b.c.d"  — longest overlap "b.c" collapsed, not just "c"
+```
+
+If there is no overlap, `.merge()` is a plain concatenation — equivalent to `.to()`.
+
+## subtract — remove a known prefix
+
+`.subtract(prefix)` returns a new path with the prefix stripped, or `null` if the prefix does not match:
+
+```ts
+import { path } from "data-path";
+
+type Department = { name: string };
+type Company = { departments: Department[] };
+
+const full = path((c: Company) => c.departments[0].name);
+const prefix = path((c: Company) => c.departments[0]);
+
+const relative = full.subtract(prefix);  // Path<Department, string> | null
+relative?.$;  // "name"
+
+full.subtract(path((c: Company) => c.departments[1]));  // null — mismatch
+```
+
+The return type changes the root from `Company` to `Department` — the resolved type of the prefix. This is the key DX benefit: the returned path is self-contained relative to the stripped prefix and can be passed to any function expecting a `Path<Department, V>`.
+
+## slice — segment range
+
+`.slice(start?, end?)` follows `Array.prototype.slice` semantics:
+
+```ts
+import { path } from "data-path";
+
+type Company = {
+  departments: Array<{
+    employees: Array<{ profile: { name: string } }>;
+  }>;
+};
+
+const p = path((c: Company) => c.departments[0].employees[5].profile.name);
+p.$;             // "departments.0.employees.5.profile.name"
+
+p.slice(0, 3).$; // "departments.0.employees"
+p.slice(-2).$;   // "profile.name"
+```
+
+Useful when a path was built dynamically and you need a subsection of it.
+
+## parent — drop the last segment
+
+```ts
+import { path } from "data-path";
+
+type User = { profile: { name: string } };
+
+const namePath = path((u: User) => u.profile.name);
+
+namePath.parent()?.$;                     // "profile"
+namePath.parent()?.parent()?.$;           // ""  (root path)
+namePath.parent()?.parent()?.parent();    // null — already at root
+```
+
+`.parent()` returns `null` on a root (zero-segment) path.
+
+## See also
+
+- [Relational](/data-path/guides/relational/) — `startsWith`, `covers`, `match` for comparing paths
+- [Templates](/data-path/guides/templates/) — `to` on template paths

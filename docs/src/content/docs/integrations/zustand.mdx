@@ -1,0 +1,98 @@
+---
+title: Zustand
+description: Immutable nested state updates in Zustand stores without Immer.
+---
+
+Updating deeply nested state in Zustand requires spreading every intermediate object by hand. This grows quickly with nesting depth and is easy to get wrong. `data-path` replaces manual spreading with a single `.set()` call that handles the structural clone automatically.
+
+## Basic usage
+
+```ts
+import { create } from "zustand";
+import { path } from "data-path";
+
+type StoreState = {
+  user: {
+    profile: { firstName: string; theme: "light" | "dark" };
+  };
+  setFirstName: (name: string) => void;
+  setTheme: (theme: "light" | "dark") => void;
+};
+
+const firstNamePath = path((s: StoreState) => s.user.profile.firstName);
+const themePath = path((s: StoreState) => s.user.profile.theme);
+
+const useStore = create<StoreState>((set) => ({
+  user: { profile: { firstName: "Alice", theme: "light" } },
+
+  setFirstName: (name) => set((state) => firstNamePath.set(state, name)),
+  setTheme: (theme) => set((state) => themePath.set(state, theme)),
+}));
+```
+
+`path.set(state, value)` returns a structural clone in which every object on the path is replaced, but every unrelated branch keeps its reference identity. Zustand's default selector equality is `Object.is`, so selectors that pick a subtree you didn't touch see the same reference and skip re-renders; selectors that pick the touched subtree see a new reference and re-render. (Shallow equality via `useShallow` / `useStoreWithEqualityFn` is opt-in and orthogonal — `data-path` doesn't require it.)
+
+## Compared to manual spreading
+
+```ts
+// Before — manual spreading for each level
+setTheme: (theme) =>
+  set((state) => ({
+    ...state,
+    user: {
+      ...state.user,
+      profile: { ...state.user.profile, theme },
+    },
+  })),
+
+// After — path handles the clone
+setTheme: (theme) => set((state) => themePath.set(state, theme)),
+```
+
+## update for read-modify-write
+
+When the new value depends on the current value, use `.update()`:
+
+```ts
+type Counter = { stats: { clickCount: number } };
+
+const clickCountPath = path((s: Counter) => s.stats.clickCount);
+
+const useCounter = create<Counter & { increment: () => void }>((set) => ({
+  stats: { clickCount: 0 },
+  increment: () =>
+    set((state) => clickCountPath.update(state, (n) => (n ?? 0) + 1)),
+}));
+```
+
+## Array items
+
+Capture the index from a selector and build the path dynamically:
+
+```ts
+type ListStore = { items: Array<{ text: string; done: boolean }> };
+
+const useTodos = create<ListStore & { toggle: (i: number) => void }>((set) => ({
+  items: [],
+  toggle: (i) =>
+    set((state) =>
+      path((s: ListStore) => s.items[i].done).update(state, (v) => !v)
+    ),
+}));
+```
+
+## Defining paths outside the store
+
+Paths used in multiple actions can be defined at module level. The path does not hold a reference to the store, so there are no lifecycle concerns:
+
+```ts
+const profilePath = path((s: StoreState) => s.user.profile);
+const firstNamePath = profilePath.to((p) => p.firstName);
+const themePath = profilePath.to((p) => p.theme);
+```
+
+## See also
+
+- [Data access](/data-path/guides/data-access/) — `set`, `update`, and how structural clones work
+- [Path algebra](/data-path/guides/path-algebra/) — `to` for composing paths from a common base
+- [React `useState`](/data-path/integrations/react-usestate/) — the same pattern for local component state

@@ -1,0 +1,143 @@
+---
+title: React useState
+description: Immutable nested state updates for deeply nested useState without manual spreading.
+---
+
+React requires a new object reference on every state update. For deeply nested state, this means spreading every intermediate object by hand. `data-path` replaces manual spreading with a single `.set()` or `.update()` call.
+
+## Basic usage
+
+```tsx
+import { useState } from "react";
+import { path } from "data-path";
+
+type AppState = {
+  user: {
+    profile: { firstName: string; theme: "light" | "dark" };
+  };
+};
+
+const firstNamePath = path((s: AppState) => s.user.profile.firstName);
+const themePath = path((s: AppState) => s.user.profile.theme);
+
+function ProfileSettings() {
+  const [state, setState] = useState<AppState>({
+    user: { profile: { firstName: "Alice", theme: "light" } },
+  });
+
+  const setFirstName = (name: string) =>
+    setState((prev) => firstNamePath.set(prev, name));
+
+  const toggleTheme = () =>
+    setState((prev) =>
+      themePath.update(prev, (t) => (t === "light" ? "dark" : "light"))
+    );
+
+  return (
+    <div>
+      <input
+        value={state.user.profile.firstName}
+        onChange={(e) => setFirstName(e.target.value)}
+      />
+      <button onClick={toggleTheme}>
+        Theme: {state.user.profile.theme}
+      </button>
+    </div>
+  );
+}
+```
+
+## Compared to manual spreading
+
+```ts
+// Before — spreading each level
+setState((prev) => ({
+  ...prev,
+  user: {
+    ...prev.user,
+    profile: { ...prev.user.profile, theme: "dark" },
+  },
+}));
+
+// After — structural clone handled automatically
+setState((prev) => themePath.set(prev, "dark"));
+```
+
+The behavior is identical: `path.set()` returns a structural clone. React detects the new reference and re-renders as expected.
+
+## Array items
+
+Capture the index at the call site and build the path dynamically:
+
+```tsx
+type ListState = { items: Array<{ label: string; done: boolean }> };
+
+const labelPath = (i: number) =>
+  path((s: ListState) => s.items[i].label);
+
+const donePath = (i: number) =>
+  path((s: ListState) => s.items[i].done);
+
+function TodoList() {
+  const [state, setState] = useState<ListState>({ items: [] });
+
+  const toggle = (i: number) =>
+    setState((prev) =>
+      donePath(i).update(prev, (v) => !v)
+    );
+
+  return (
+    <ul>
+      {state.items.map((item, i) => (
+        <li key={i} onClick={() => toggle(i)}>
+          {item.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+## Defining paths at module level
+
+Paths that don't depend on runtime indices can be defined outside the component — they are plain values with no lifecycle:
+
+```ts
+// Module level — created once, stable across renders
+const themePath = path((s: AppState) => s.user.profile.theme);
+
+function ThemeToggle() {
+  const [state, setState] = useState<AppState>(defaultState);
+  const toggle = () =>
+    setState((prev) =>
+      themePath.update(prev, (t) => (t === "light" ? "dark" : "light"))
+    );
+  // ...
+}
+```
+
+## useReducer
+
+The same pattern applies with `useReducer` — pass the path and value through the action:
+
+```ts
+type Action =
+  | { type: "SET_THEME"; theme: "light" | "dark" }
+  | { type: "SET_NAME"; name: string };
+
+function reducer(state: AppState, action: Action): AppState {
+  switch (action.type) {
+    case "SET_THEME":
+      return themePath.set(state, action.theme);
+    case "SET_NAME":
+      return firstNamePath.set(state, action.name);
+    default:
+      return state;
+  }
+}
+```
+
+## See also
+
+- [Data access](/data-path/guides/data-access/) — `set`, `update`, and immutability details
+- [Zustand](/data-path/integrations/zustand/) — the same pattern for global stores

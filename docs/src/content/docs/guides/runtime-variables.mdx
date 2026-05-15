@@ -1,0 +1,91 @@
+---
+title: Runtime variables
+description: Use dynamic indices, closure variables, and computed keys inside path lambdas.
+---
+
+The lambda passed to `path()` is executed once at creation time — the proxy records every property access and index operation. Because this is real JavaScript execution, any values that are in scope at that moment become part of the path.
+
+## Dynamic array indices
+
+```ts
+import { path } from "data-path";
+
+type AppData = { users: Array<{ name: string }> };
+
+function userNamePath(index: number) {
+  return path((d: AppData) => d.users[index].name);
+}
+
+userNamePath(0).$  // "users.0.name"
+userNamePath(5).$  // "users.5.name"
+```
+
+The path is fully resolved at the time `path()` is called. `index` is evaluated immediately, not lazily.
+
+## Computed property keys
+
+Any expression that evaluates to a string or number works as a key:
+
+```ts
+type Config = { settings: Record<string, string> };
+
+const key = "theme";
+const themePath = path((c: Config) => c.settings[key]);
+themePath.$  // "settings.theme"
+```
+
+## Multiple runtime values
+
+```ts
+type Grid = { rows: Array<Array<{ value: number }>> };
+
+function cellPath(row: number, col: number) {
+  return path((g: Grid) => g.rows[row][col].value);
+}
+
+cellPath(2, 3).$  // "rows.2.3.value"
+```
+
+## Closures over loop variables
+
+In a `.map()` or similar loop, the lambda captures the current iteration value:
+
+```ts
+type Form = { users: Array<{ email: string }> };
+
+const fieldPaths = [0, 1, 2].map((i) =>
+  path((f: Form) => f.users[i].email)
+);
+
+fieldPaths.map((p) => p.$)  // ["users.0.email", "users.1.email", "users.2.email"]
+```
+
+## The evaluation-once guarantee
+
+The lambda runs exactly once. Expressions with side effects run only at path creation:
+
+```ts
+let count = 0;
+const p = path((u: User) => u.tags[count++]);
+count  // 1 — incremented during creation
+p.$    // "tags.0"
+```
+
+If the lambda depends on state that changes later, create a new path rather than mutating the captured value.
+
+## When to use wildcards instead
+
+Runtime variables are the right choice when you know the specific index at creation time. Use `.each()` or `.deep()` when you need to operate across all items without knowing the count:
+
+```ts
+// Known index — runtime variable
+const thirdItemPath = path((d: AppData) => d.users[2].name);
+
+// All items — template wildcard
+const allNamesPath = path((d: AppData) => d.users).each((u) => u.name);
+```
+
+## See also
+
+- [Templates](/data-path/guides/templates/) — `each` and `deep` for unknown-count bulk operations
+- [Data access](/data-path/guides/data-access/) — `get`, `set`, `update`

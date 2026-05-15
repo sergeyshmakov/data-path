@@ -1,107 +1,43 @@
-import { DEEP_WILDCARD, PATH_SEGMENTS, WILDCARD } from "../constants.js";
+import { PATH_SEGMENTS } from "../constants.js";
 import type {
 	BasePath,
 	CollectionItem,
-	DeepReachable,
-	MatchResult,
 	Path,
-	PathExpression,
 	ResolvablePath,
 	Segment,
 	TemplatePath,
 	TraversablePathMethods,
 } from "../types.js";
-import {
-	createPathProxy,
-	matchesPrefix,
-	patternMatches,
-	resolveSegments,
-	segmentsEqual,
-} from "../utils.js";
+import { createPathProxy, resolveSegments, segmentsEqual } from "../utils.js";
+import { AbstractPathImpl, DEEP_WILDCARD, WILDCARD } from "./base-path-impl.js";
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-let TemplatePathCtor: Function;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-export function setTemplatePathCtor(ctor: Function) {
-	TemplatePathCtor = ctor;
-}
+// ---------------------------------------------------------------------------
+// PathImpl — concrete path with no wildcards
+// ---------------------------------------------------------------------------
 
-export class PathImpl<T = unknown, V = unknown, P extends string = string>
-	implements BasePath<T, V, P>, TraversablePathMethods<T, V>
+export class PathImpl<T = unknown, V = unknown>
+	extends AbstractPathImpl<T, V>
+	implements BasePath<T, V>, TraversablePathMethods<T, V>
 {
-	readonly segments: readonly Segment[];
+	readonly fn: (data: T) => V | undefined;
 
 	constructor(segments: readonly Segment[]) {
-		this.segments = segments;
+		super(segments);
+		this.fn = (data: T) => this.get(data);
 	}
 
-	/**
-	 * The number of segments in this path.
-	 */
-	get length(): number {
-		return this.segments.length;
-	}
-
-	/**
-	 * The string representation of the path (e.g. "users.0.name").
-	 * Useful for binding paths to form libraries or UI components.
-	 *
-	 * @example
-	 * path<Root>().users[0].name.$; // "users.0.name"
-	 */
-	get $(): P {
-		return this.toString() as P;
-	}
-
-	/**
-	 * Returns the string representation of the path (e.g. "users.0.name").
-	 *
-	 * @example
-	 * path<Root>().users[0].name.toString(); // "users.0.name"
-	 */
-	toString(): string {
-		return this.segments.join(".");
-	}
-
-	/**
-	 * Extracts the value at this path from the given data object.
-	 * Safely handles missing intermediate properties by returning `undefined` instead of throwing an error.
-	 *
-	 * @example
-	 * const namePath = path<User>().name;
-	 * const name = namePath.get({ name: "Alice" }); // "Alice"
-	 */
-	get(data: T): V {
+	get(data: T): V | undefined {
 		let current: unknown = data;
 		for (const seg of this.segments) {
-			if (current == null) return undefined as V;
-			current = (current as Record<string | number, unknown>)[seg];
+			if (current == null) return undefined;
+			current = (current as Record<PropertyKey, unknown>)[seg];
 		}
-		return current as V;
+		return current as V | undefined;
 	}
 
-	/**
-	 * Returns an accessor function that extracts the value at this path from the given data object.
-	 * Useful for array methods like `.map()` or `.filter()`.
-	 *
-	 * @example
-	 * const names = users.map(path<User>().name.fn);
-	 */
-	get fn(): (data: T) => V {
-		return (data: T) => this.get(data);
-	}
-
-	/**
-	 * Sets the value at this path in the given data object, returning a new updated object (immutable).
-	 * If intermediate properties are missing, they are automatically created as objects or arrays
-	 * depending on the segment types (numeric keys become arrays).
-	 *
-	 * @example
-	 * const namePath = path<User>().name;
-	 * const updatedUser = namePath.set({ name: "Alice" }, "Bob"); // { name: "Bob" }
-	 */
 	set(data: T, value: V): T {
 		if (this.segments.length === 0) return value as unknown as T;
+
 		const setAt = (
 			obj: unknown,
 			segs: readonly Segment[],
@@ -117,7 +53,7 @@ export class PathImpl<T = unknown, V = unknown, P extends string = string>
 				return { ...(obj as object), [key]: val };
 			}
 			const [first, ...rest] = segs;
-			const baseObj = obj as Record<string | number, unknown>;
+			const baseObj = obj as Record<PropertyKey, unknown>;
 			const next = baseObj[first];
 			const nextCopy =
 				next != null && typeof next === "object"
@@ -134,6 +70,7 @@ export class PathImpl<T = unknown, V = unknown, P extends string = string>
 			}
 			return { ...baseObj, [first]: setAt(nextCopy, rest, val) };
 		};
+
 		const baseObj =
 			typeof data === "object" && data !== null
 				? Array.isArray(data)
@@ -143,208 +80,283 @@ export class PathImpl<T = unknown, V = unknown, P extends string = string>
 		return setAt(baseObj, this.segments, value) as T;
 	}
 
-	/**
-	 * Traverses into a collection (Array or Record) to operate on each item.
-	 *
-	 * @example
-	 * const users = path<Root>().users;
-	 * const userNames = users.each(u => u.name); // Path matches all names
-	 */
+	update(data: T, updater: (current: V | undefined) => V): T {
+		return this.set(data, updater(this.get(data)));
+	}
+
+	parent(): Path<T, unknown> | null {
+		if (this.segments.length === 0) return null;
+		return makeConcrete<T, unknown>(
+			this.segments.slice(0, -1),
+		) as unknown as Path<T, unknown>;
+	}
+
+	subtract<U>(prefix: ResolvablePath<T, U>): Path<U, V> | null {
+		const a = this.segments;
+		const b = resolveSegments(prefix);
+		if (b.length > a.length) return null;
+		if (!segmentsEqual(a.slice(0, b.length), b)) return null;
+		return makeConcrete<U, V>(a.slice(b.length)) as unknown as Path<U, V>;
+	}
+
+	slice(start?: number, end?: number): Path<T, unknown> {
+		return makeConcrete<T, unknown>(
+			this.segments.slice(start, end),
+		) as unknown as Path<T, unknown>;
+	}
+
 	each<U = CollectionItem<V>>(
 		expr?: (item: CollectionItem<V>) => U,
-	): TemplatePath<T, U, string> {
-		let tailSegments: readonly Segment[] = [];
-		if (expr) {
-			const proxy = createPathProxy([]);
-			const result = expr(proxy as CollectionItem<V>);
-			tailSegments =
-				((result as Record<symbol, unknown>)?.[PATH_SEGMENTS] as Segment[]) ??
-				[];
-		}
-		return new (
-			TemplatePathCtor as new (
-				segments: readonly Segment[],
-			) => unknown
-		)([...this.segments, WILDCARD, ...tailSegments]) as unknown as TemplatePath<
-			T,
-			U,
-			string
-		>;
+	): TemplatePath<T, U> {
+		const tail = expr ? evalExpr(expr as (p: unknown) => unknown) : [];
+		return new TemplatePathImpl<T, U>([
+			...this.segments,
+			WILDCARD,
+			...tail,
+		]) as unknown as TemplatePath<T, U>;
 	}
 
-	/**
-	 * Traverses deeply into a structure, matching any nested property.
-	 *
-	 * @example
-	 * const root = path<Root>();
-	 * const allIds = root.deep(node => node.id); // Path matches any 'id' at any depth
-	 */
-	deep<U = DeepReachable<V>>(
-		expr?: (leaf: DeepReachable<V>) => U,
-	): TemplatePath<T, U, string> {
-		let tailSegments: readonly Segment[] = [];
-		if (expr) {
-			const proxy = createPathProxy([]);
-			const result = expr(proxy as DeepReachable<V>);
-			tailSegments =
-				((result as Record<symbol, unknown>)?.[PATH_SEGMENTS] as Segment[]) ??
-				[];
-		}
-		return new (
-			TemplatePathCtor as new (
-				segments: readonly Segment[],
-			) => unknown
-		)([
+	deep<U = V>(expr?: (leaf: V) => U): TemplatePath<T, U> {
+		const tail = expr ? evalExpr(expr as (p: unknown) => unknown) : [];
+		return new TemplatePathImpl<T, U>([
 			...this.segments,
 			DEEP_WILDCARD,
-			...tailSegments,
-		]) as unknown as TemplatePath<T, U, string>;
+			...tail,
+		]) as unknown as TemplatePath<T, U>;
+	}
+
+	to<U>(relative: ResolvablePath<V, U>): Path<T, U> | TemplatePath<T, U> {
+		return makeFromSegments<T, U>([
+			...this.segments,
+			...resolveSegments(relative),
+		]) as unknown as Path<T, U> | TemplatePath<T, U>;
+	}
+
+	merge<U>(other: ResolvablePath<T, U>): Path<T, U> | TemplatePath<T, U> {
+		return makeFromSegments<T, U>(
+			mergeSegments(this.segments, resolveSegments(other)),
+		) as unknown as Path<T, U> | TemplatePath<T, U>;
+	}
+}
+
+/**
+ * Returns a concrete `PathImpl` when `segments` contains no wildcard
+ * sentinels, otherwise a `TemplatePathImpl` so `.get()` correctly expands
+ * matches.
+ *
+ * Safe by construction: wildcards are unique Symbols (see
+ * {@link WILDCARD} / {@link DEEP_WILDCARD}). Legitimate object keys named
+ * `"*"` or `"**"` are stored as strings and never trigger the template
+ * branch.
+ */
+function makeFromSegments<T, V>(
+	segments: readonly Segment[],
+): PathImpl<T, V> | TemplatePathImpl<T, V> {
+	return hasWildcard(segments)
+		? new TemplatePathImpl<T, V>(segments)
+		: new PathImpl<T, V>(segments);
+}
+
+function hasWildcard(segments: readonly Segment[]): boolean {
+	for (const s of segments) {
+		if (s === WILDCARD || s === DEEP_WILDCARD) return true;
+	}
+	return false;
+}
+
+// ---------------------------------------------------------------------------
+// TemplatePathImpl — path containing * or ** wildcards
+// ---------------------------------------------------------------------------
+
+export class TemplatePathImpl<
+	T = unknown,
+	V = unknown,
+> extends AbstractPathImpl<T, V> {
+	// fn returns V[] (not V|undefined) — no covariance conflict since we don't
+	// extend PathImpl; the declared type here matches TemplatePath<T,V>.fn.
+	readonly fn: (data: T) => V[];
+
+	constructor(segments: readonly Segment[]) {
+		super(segments);
+		this.fn = (data: T) => this.get(data);
+	}
+
+	get(data: T): V[] {
+		return this.expand(data).map(
+			// expand() only returns paths where the key exists in data, so get() is safe
+			(p) => p.get(data) as V,
+		);
+	}
+
+	set(data: T, value: V): T {
+		const paths = this.expand(data);
+		let current = data;
+		for (const p of paths) {
+			current = p.set(current, value);
+		}
+		return current;
 	}
 
 	/**
-	 * Checks if this path starts with the segments of another path.
-	 *
-	 * @example
-	 * const a = path<Root>().users[0].name;
-	 * const b = path<Root>().users;
-	 * a.startsWith(b); // true
+	 * Applies `updater` to each matched value individually (per-item transform).
+	 * Use `.set(data, constant)` to assign the same value to every match.
 	 */
-	startsWith(other: ResolvablePath<T>): boolean {
-		return matchesPrefix(this.segments, resolveSegments(other));
+	update(data: T, updater: (current: V | undefined) => V): T {
+		const paths = this.expand(data);
+		let current = data;
+		for (const p of paths) {
+			current = p.set(current, updater(p.get(current)));
+		}
+		return current;
 	}
 
-	/**
-	 * Checks if this path encompasses the segments of another path (i.e., this path is a prefix of the other).
-	 *
-	 * @example
-	 * const a = path<Root>().users;
-	 * const b = path<Root>().users[0].name;
-	 * a.includes(b); // true
-	 */
-	includes(other: ResolvablePath<T>): boolean {
-		return matchesPrefix(resolveSegments(other), this.segments);
+	parent(): Path<T, unknown> | TemplatePath<T, unknown> | null {
+		if (this.segments.length === 0) return null;
+		return makeFromSegments<T, unknown>(
+			this.segments.slice(0, -1),
+		) as unknown as Path<T, unknown> | TemplatePath<T, unknown>;
 	}
 
-	/**
-	 * Checks if this path is exactly equal to another path.
-	 *
-	 * @example
-	 * const a = path<Root>().users;
-	 * const b = path<Root>().users;
-	 * a.equals(b); // true
-	 */
-	equals(other: ResolvablePath<T>): boolean {
-		return segmentsEqual(this.segments, resolveSegments(other));
-	}
-
-	/**
-	 * Matches this path against another path, returning their relationship.
-	 *
-	 * @example
-	 * const a = path<Root>().users[0];
-	 * const b = path<Root>().users;
-	 * a.match(b); // { relation: 'child', params: {} }
-	 */
-	match(other: ResolvablePath<T>): MatchResult | null {
-		const otherSegs = resolveSegments(other);
-		if (segmentsEqual(this.segments, otherSegs)) {
-			return { relation: "equals", params: {} };
-		}
-		if (
-			matchesPrefix(this.segments, otherSegs) &&
-			this.segments.length > otherSegs.length
-		) {
-			return { relation: "child", params: {} };
-		}
-		if (
-			matchesPrefix(otherSegs, this.segments) &&
-			otherSegs.length > this.segments.length
-		) {
-			return { relation: "parent", params: {} };
-		}
-		if (patternMatches(this.segments, otherSegs)) {
-			return { relation: "includes", params: {} };
-		}
-		if (patternMatches(otherSegs, this.segments)) {
-			return { relation: "included-by", params: {} };
-		}
-		return null;
-	}
-
-	/**
-	 * Appends another path to the end of this path. If the end of this path matches
-	 * the beginning of the other path, the overlapping segments are intelligently deduplicated.
-	 *
-	 * @example
-	 * const base = path<Root>().users;
-	 * const full = base.merge(p => p[0].name); // equivalent to path<Root>().users[0].name
-	 */
-	merge<U>(other: ResolvablePath<T, U>): Path<T, U, string> {
+	subtract<U>(
+		prefix: ResolvablePath<T, U>,
+	): Path<U, V> | TemplatePath<U, V> | null {
 		const a = this.segments;
-		const b = resolveSegments(other);
-		let overlapLen = 0;
-		for (let len = Math.min(a.length, b.length); len >= 1; len--) {
-			const aSuffix = a.slice(-len);
-			const bPrefix = b.slice(0, len);
-			if (segmentsEqual(aSuffix, bPrefix)) {
-				overlapLen = len;
-				break;
-			}
-		}
-		const merged =
-			overlapLen > 0 ? [...a.slice(0, -overlapLen), ...b] : [...a, ...b];
-		return new PathImpl<T, U, string>(merged);
-	}
-
-	/**
-	 * Removes the segments of another path from either the beginning or the end of this path.
-	 * Returns `null` if the other path is neither a prefix nor a suffix.
-	 *
-	 * @example
-	 * const full = path<Root>().users[0].name;
-	 * const base = path<Root>().users;
-	 * const remainder = full.subtract(base); // equivalent to path()[0].name
-	 */
-	subtract(other: ResolvablePath<T>): Path<T, V, string> | null {
-		const a = this.segments;
-		const b = resolveSegments(other);
+		const b = resolveSegments(prefix);
 		if (b.length > a.length) return null;
-		if (segmentsEqual(a, b)) return new PathImpl<T, V, string>([]);
-		// b prefix of a?
-		if (segmentsEqual(a.slice(0, b.length), b)) {
-			return new PathImpl<T, V, string>(a.slice(b.length));
-		}
-		// b suffix of a?
-		if (segmentsEqual(a.slice(-b.length), b)) {
-			return new PathImpl<T, V, string>(a.slice(0, -b.length));
-		}
-		return null;
+		if (!segmentsEqual(a.slice(0, b.length), b)) return null;
+		return makeFromSegments<U, V>(a.slice(b.length)) as unknown as
+			| Path<U, V>
+			| TemplatePath<U, V>;
+	}
+
+	slice(
+		start?: number,
+		end?: number,
+	): Path<T, unknown> | TemplatePath<T, unknown> {
+		return makeFromSegments<T, unknown>(
+			this.segments.slice(start, end),
+		) as unknown as Path<T, unknown> | TemplatePath<T, unknown>;
+	}
+
+	each<U = CollectionItem<V>>(
+		expr?: (item: CollectionItem<V>) => U,
+	): TemplatePath<T, U> {
+		const tail = expr ? evalExpr(expr as (p: unknown) => unknown) : [];
+		return new TemplatePathImpl<T, U>([
+			...this.segments,
+			WILDCARD,
+			...tail,
+		]) as unknown as TemplatePath<T, U>;
+	}
+
+	deep<U = V>(expr?: (leaf: V) => U): TemplatePath<T, U> {
+		const tail = expr ? evalExpr(expr as (p: unknown) => unknown) : [];
+		return new TemplatePathImpl<T, U>([
+			...this.segments,
+			DEEP_WILDCARD,
+			...tail,
+		]) as unknown as TemplatePath<T, U>;
+	}
+
+	to<U>(relative: ResolvablePath<V, U>): TemplatePath<T, U> {
+		const tail = resolveSegments(relative);
+		return new TemplatePathImpl<T, U>([
+			...this.segments,
+			...tail,
+		]) as unknown as TemplatePath<T, U>;
+	}
+
+	merge<U>(other: ResolvablePath<T, U>): TemplatePath<T, U> {
+		return new TemplatePathImpl<T, U>(
+			mergeSegments(this.segments, resolveSegments(other)),
+		) as unknown as TemplatePath<T, U>;
 	}
 
 	/**
-	 * Returns a new path containing a subset of the segments, similar to Array.prototype.slice.
-	 *
-	 * @example
-	 * const full = path<Root>().users[0].name;
-	 * full.slice(0, 1); // equivalent to path<Root>().users
+	 * Resolves this template to all concrete paths that exist in `data`.
 	 */
-	slice(start?: number, end?: number): Path<T, unknown, string> {
-		const s = this.segments.slice(start, end);
-		return new PathImpl<T, unknown, string>(s);
-	}
+	expand(data: T): Path<T, V>[] {
+		const results: Path<T, V>[] = [];
 
-	/**
-	 * Extends the current path using a lambda expression starting from the resolved value.
-	 *
-	 * @example
-	 * const userPath = path<Root>().users[0];
-	 * const namePath = userPath.to(u => u.name);
-	 */
-	to<U>(expr: PathExpression<V, U>): Path<T, U, string> {
-		const proxy = createPathProxy([]);
-		const result = expr(proxy as V);
-		const tailSegments =
-			((result as Record<symbol, unknown>)?.[PATH_SEGMENTS] as Segment[]) ?? [];
-		return new PathImpl<T, U, string>([...this.segments, ...tailSegments]);
+		const walk = (current: unknown, idx: number, acc: Segment[]): void => {
+			if (idx >= this.segments.length) {
+				results.push(new PathImpl<T, V>(acc));
+				return;
+			}
+			const seg = this.segments[idx];
+
+			if (seg === WILDCARD) {
+				if (current != null && typeof current === "object") {
+					const keys = Array.isArray(current)
+						? (Array.from(current.keys()) as number[])
+						: Object.keys(current);
+					for (const key of keys) {
+						walk((current as Record<PropertyKey, unknown>)[key], idx + 1, [
+							...acc,
+							key,
+						]);
+					}
+				}
+			} else if (seg === DEEP_WILDCARD) {
+				// Try matching rest of pattern at current depth
+				walk(current, idx + 1, acc);
+				// Recurse into every child
+				if (current != null && typeof current === "object") {
+					const keys = Array.isArray(current)
+						? (Array.from(current.keys()) as number[])
+						: Object.keys(current);
+					for (const key of keys) {
+						walk((current as Record<PropertyKey, unknown>)[key], idx, [
+							...acc,
+							key,
+						]);
+					}
+				}
+			} else {
+				if (
+					current != null &&
+					typeof current === "object" &&
+					seg in (current as object)
+				) {
+					walk((current as Record<PropertyKey, unknown>)[seg], idx + 1, [
+						...acc,
+						seg,
+					]);
+				}
+			}
+		};
+
+		walk(data, 0, []);
+		return results;
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Private helpers
+// ---------------------------------------------------------------------------
+
+function makeConcrete<T, V>(segments: readonly Segment[]): PathImpl<T, V> {
+	return new PathImpl<T, V>(segments);
+}
+
+function evalExpr(expr: (proxy: unknown) => unknown): readonly Segment[] {
+	const proxy = createPathProxy([]);
+	const result = expr(proxy);
+	return (
+		((result as Record<symbol, unknown>)?.[PATH_SEGMENTS] as Segment[]) ?? []
+	);
+}
+
+function mergeSegments(
+	a: readonly Segment[],
+	b: readonly Segment[],
+): readonly Segment[] {
+	let overlapLen = 0;
+	for (let len = Math.min(a.length, b.length); len >= 1; len--) {
+		if (segmentsEqual(a.slice(-len), b.slice(0, len))) {
+			overlapLen = len;
+			break;
+		}
+	}
+	return overlapLen > 0 ? [...a.slice(0, -overlapLen), ...b] : [...a, ...b];
 }

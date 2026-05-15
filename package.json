@@ -1,17 +1,28 @@
 {
 	"name": "data-path",
 	"version": "1.0.0",
-	"description": "A simple, modern, zero-dependency, and fully type-safe library for building, comparing, and manipulating object property paths using TypeScript lambda expressions.",
-	"license": "ISC",
-	"type": "commonjs",
-	"main": "./dist/index.js",
-	"module": "./dist/index.mjs",
-	"types": "./dist/index.d.ts",
+	"description": "Type-safe object property paths in TypeScript — build, compare, and manipulate with lambda expressions. Zero dependencies.",
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": {
+				"types": "./dist/index.d.cts",
+				"default": "./dist/index.cjs"
+			},
+			"default": "./dist/index.js"
+		}
+	},
+	"sideEffects": false,
 	"files": [
 		"dist"
 	],
 	"scripts": {
-		"build": "tsup src/index.ts --format cjs,esm --dts --clean",
+		"build": "tsup src/index.ts --format cjs,esm --dts --clean --sourcemap",
 		"dev": "npm run build -- --watch",
 		"lint": "biome check src",
 		"lint:fix": "biome check --write src",
@@ -24,12 +35,16 @@
 		"typescript",
 		"path",
 		"object-path",
+		"property-path",
 		"type-safe",
 		"proxy",
+		"lambda",
 		"dot-notation",
-		"property-path",
 		"accessor",
-		"data-path"
+		"immutable",
+		"path-algebra",
+		"state-management",
+		"form"
 	],
 	"author": {
 		"name": "Sergei Shmakov",
@@ -42,17 +57,43 @@
 	"bugs": {
 		"url": "https://github.com/sergeyshmakov/data-path/issues"
 	},
-	"homepage": "https://github.com/sergeyshmakov/data-path#readme",
+	"homepage": "https://sergeyshmakov.github.io/data-path/",
 	"release": {
 		"branches": [
 			"main"
+		],
+		"plugins": [
+			"@semantic-release/commit-analyzer",
+			"@semantic-release/release-notes-generator",
+			[
+				"@semantic-release/changelog",
+				{
+					"changelogFile": "CHANGELOG.md"
+				}
+			],
+			"@semantic-release/npm",
+			[
+				"@semantic-release/git",
+				{
+					"assets": [
+						"package.json",
+						"package-lock.json",
+						"CHANGELOG.md"
+					],
+					"message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+				}
+			],
+			"@semantic-release/github"
 		]
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.6",
 		"@commitlint/cli": "^20.4.3",
 		"@commitlint/config-conventional": "^20.4.3",
+		"@semantic-release/changelog": "^6.0.3",
+		"@semantic-release/git": "^10.0.1",
 		"husky": "^9.1.7",
+		"lint-staged": "^16.4.0",
 		"semantic-release": "^25.0.3",
 		"tsup": "^8.5.1",
 		"typescript": "^5.9.3",
@@ -62,7 +103,7 @@
 		"typescript": ">=5.0.0"
 	},
 	"engines": {
-		"node": ">=20.0.0"
+		"node": ">=20"
 	},
 	"volta": {
 		"node": "24.14.0"

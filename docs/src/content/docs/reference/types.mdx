@@ -1,0 +1,166 @@
+---
+title: Types
+description: TypeScript types exported from data-path.
+---
+
+## Path\<T, V\>
+
+A concrete path with no wildcards. `T` is the root type, `V` is the type at the leaf.
+
+```ts
+import type { Path } from "data-path";
+
+function register<T>(fieldPath: Path<T, string>, value: string) {
+  // fieldPath.$ is the dot-notation name
+  // fieldPath.get(data) returns string | undefined
+}
+```
+
+`Path<T, V>` conditionally includes `.each()` and `.deep()` — they are only present when `V` is not a primitive type. The full primitive set is `string | number | boolean | bigint | symbol | null | undefined`. This prevents calling `.each()` on a path that resolves to a leaf value, including paths whose resolved type is `null` or `undefined` (e.g. optional fields, nullable leaves).
+
+```ts
+const namePath = path((u: User) => u.profile.name);   // V = string (primitive)
+// namePath.each  ← not present in autocomplete
+
+const profilePath = path((u: User) => u.profile);     // V = { name: string }
+profilePath.each((p) => p.name)  // ✓ V is non-primitive
+```
+
+This guard is enforced at the type level — if `.each()` or `.deep()` are absent from autocomplete, the path already resolves to a scalar leaf value.
+
+## TemplatePath\<T, V\>
+
+A path containing one or more wildcards (`*` or `**`). Returned by `.each()` and `.deep()`.
+
+```ts
+import type { TemplatePath } from "data-path";
+
+function processAll<T, V>(
+  tmpl: TemplatePath<T, V>,
+  data: T,
+  transform: (v: V) => V,
+): T {
+  return tmpl.update(data, transform);
+}
+```
+
+Key differences from `Path`:
+- `.get(data)` returns `V[]` instead of `V | undefined`
+- `.fn` is `(data: T) => V[]`
+- `.expand(data)` returns `Path<T, V>[]`
+- `.to()` and `.merge()` return `TemplatePath<T, U>` rather than `Path<T, U>`
+
+## BasePath\<T, V\>
+
+The shared base type for both `Path` and `TemplatePath`. Use it when your function accepts either kind:
+
+```ts
+import type { BasePath } from "data-path";
+
+function getSegmentString<T, V>(p: BasePath<T, V>): string {
+  return p.$;
+}
+```
+
+`BasePath` does not include `.each()`, `.deep()`, `.expand()`, or the overridden `get`/`fn` signatures of `TemplatePath`.
+
+## ResolvedType\<P\>
+
+Extracts the leaf type `V` from a `Path` or `TemplatePath`:
+
+```ts
+import type { ResolvedType } from "data-path";
+
+const agePath = path((u: User) => u.profile.age);
+type Age = ResolvedType<typeof agePath>;  // number
+
+const nameTmpl = path((u: User) => u.tags).each();
+type Tag = ResolvedType<typeof nameTmpl>;  // string
+```
+
+Returns `never` for non-path types.
+
+## CollectionItem\<V\>
+
+Extracts the element type from an array or the value type from a `Record`:
+
+```ts
+import type { CollectionItem } from "data-path";
+
+type A = CollectionItem<string[]>;              // string
+type B = CollectionItem<Record<string, number>>; // number
+type C = CollectionItem<string>;                // unknown
+```
+
+Used as the default value type in `.each()` — `each()` without an argument returns `TemplatePath<T, CollectionItem<V>>`.
+
+## Segment
+
+A single path segment. Most segments are either a `string` key or a `number` index:
+
+```ts
+import type { Segment } from "data-path";
+
+const segments: Segment[] = ["profile", "tags", 0];
+```
+
+Templates created by `.each()` and `.deep()` insert wildcard sentinels into their segment list. The sentinels are unique `Symbol` values (not the strings `"*"` / `"**"`), so legitimate object keys named `"*"` or `"**"` are preserved as literal segments and never reinterpreted as wildcards.
+
+```ts
+import { path, unsafePath, WILDCARD } from "data-path";
+
+type Data = { items: { id: string }[] };
+const tmpl = path((d: Data) => d.items).each();
+tmpl.segments;  // ["items", WILDCARD]  — symbol, not the string "*"
+tmpl.$;         // "items.*"             — renders as "*" in dot-notation
+
+type Bag = { a: Record<string, { b: number }> };
+const literal = unsafePath<Bag, number>("a.*.b");
+literal.segments;  // ["a", "*", "b"]   — pure strings; "*" is a literal key
+literal.get({ a: { "*": { b: 1 }, x: { b: 2 } } });  // 1
+```
+
+`WILDCARD` and `DEEP_WILDCARD` are exported when you need to construct a template from a raw segment array (for example, to round-trip through JSON — see [Templates](/data-path/guides/templates/)).
+
+## MatchResult
+
+`.match(other)` returns `MatchResult | null` — a non-null result when the paths are structurally related, or `null` when they are unrelated (no shared prefix and no wildcard match). Always guard for `null` at the call site:
+
+```ts
+import type { MatchResult } from "data-path";
+
+type MatchResult = {
+  relation: "equals" | "parent" | "child" | "covers" | "covered-by";
+};
+
+const result = namePath.match(otherPath);
+if (result === null) {
+  // paths are unrelated
+} else {
+  switch (result.relation) { /* ... */ }
+}
+```
+
+| Relation | Meaning |
+|----------|---------|
+| `"equals"` | Both paths are identical |
+| `"parent"` | `this` is a prefix of `other` |
+| `"child"` | `other` is a prefix of `this` |
+| `"covers"` | `this` contains a wildcard matching `other` |
+| `"covered-by"` | `other` contains a wildcard matching `this` |
+| `null` (return value, not a relation) | `this` and `other` share no prefix and no wildcard relationship |
+
+## ResolvablePath\<T, V\>
+
+Accepted by all relational and algebra methods. Any of:
+
+- `Path<T, V>` or `TemplatePath<T, V>`
+- A lambda `(proxy: T) => V`
+- An object `{ segments: readonly Segment[] }`
+
+This lets methods like `.merge()`, `.subtract()`, `.equals()`, and `.startsWith()` accept inline lambdas:
+
+```ts
+namePath.startsWith((u: User) => u.profile);
+namePath.subtract((u: User) => u.profile);
+```
