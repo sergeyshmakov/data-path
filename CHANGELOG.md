@@ -1,3 +1,11 @@
+## [2.0.1](https://github.com/sergeyshmakov/data-path/compare/v2.0.0...v2.0.1) (2026-05-15)
+
+
+### Bug Fixes
+
+* .match() agrees with .covers() for wildcard prefix coverage ([59412f4](https://github.com/sergeyshmakov/data-path/commit/59412f40a99e3a43ac6674cdc1805383f3d2d712))
+* matchesPrefix rejects single-segment pattern vs ** in full ([49b53f3](https://github.com/sergeyshmakov/data-path/commit/49b53f3cbc5de4173e053cbd3307245ddcdf5dc1))
+
 # [2.0.0](https://github.com/sergeyshmakov/data-path/compare/v1.0.3...v2.0.0) (2026-05-15)
 
 
