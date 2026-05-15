@@ -78,6 +78,11 @@ export function matchesPrefix(
 			return false;
 		}
 		if (f >= full.length) return false;
+		// `**` on `full`'s side stands for 0..N segments; a single-segment
+		// element in `prefix` (literal or `*`) can't absorb it. Without this
+		// guard, `prefix.WILDCARD` short-circuits the next check and silently
+		// treats `**` as one segment.
+		if (full[f] === DEEP_WILDCARD && prefix[p] !== DEEP_WILDCARD) return false;
 		if (prefix[p] !== WILDCARD && prefix[p] !== full[f]) return false;
 		p++;
 		f++;
