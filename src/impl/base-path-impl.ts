@@ -9,7 +9,6 @@ import type {
 import {
 	hasWildcardSegment,
 	matchesPrefix,
-	patternMatches,
 	resolveSegments,
 	segmentsEqual,
 } from "../utils.js";
@@ -58,29 +57,36 @@ export abstract class AbstractPathImpl<T = unknown, V = unknown> {
 		const otherSegs = resolveSegments(other);
 		if (segmentsEqual(this.segments, otherSegs)) return { relation: "equals" };
 
-		// Check wildcard coverage BEFORE literal prefix. patternMatches handles
-		// `**` collapsing, so a deep template can fully cover a concrete path of
-		// any length — that's a "covers", not "parent". Order matters: a literal
-		// prefix check that's wildcard-aware (via matchesPrefix) would otherwise
-		// misclassify "a.**.b covers a.x.y.b" as "parent".
-		if (patternMatches(this.segments, otherSegs)) return { relation: "covers" };
-		if (patternMatches(otherSegs, this.segments))
+		const thisHasWild = hasWildcardSegment(this.segments);
+		const otherHasWild = hasWildcardSegment(otherSegs);
+
+		// Wildcard coverage: a wildcard-bearing side covers the other when its
+		// segments form a prefix-pattern of the other's segments. This includes
+		// both exact matches (template fully expands to the concrete) and prefix
+		// matches (template covers a region the concrete sits inside).
+		// `matchesPrefix(full, prefix)` returns true exactly in those cases when
+		// the prefix carries wildcards, so it unifies what `.covers()` does with
+		// what `.match()` should report.
+		if (thisHasWild && matchesPrefix(otherSegs, this.segments))
+			return { relation: "covers" };
+		if (otherHasWild && matchesPrefix(this.segments, otherSegs))
 			return { relation: "covered-by" };
 
-		// Literal parent/child: the shorter side must be wildcard-free, otherwise
-		// it's not a literal prefix.
-		if (
-			!hasWildcardSegment(otherSegs) &&
-			matchesPrefix(this.segments, otherSegs) &&
-			this.segments.length > otherSegs.length
-		)
-			return { relation: "child" };
-		if (
-			!hasWildcardSegment(this.segments) &&
-			matchesPrefix(otherSegs, this.segments) &&
-			otherSegs.length > this.segments.length
-		)
-			return { relation: "parent" };
+		// Literal parent/child: both sides must be wildcard-free. A wildcard
+		// prefix is not a literal prefix.
+		if (!thisHasWild && !otherHasWild) {
+			if (
+				matchesPrefix(this.segments, otherSegs) &&
+				this.segments.length > otherSegs.length
+			)
+				return { relation: "child" };
+			if (
+				matchesPrefix(otherSegs, this.segments) &&
+				otherSegs.length > this.segments.length
+			)
+				return { relation: "parent" };
+		}
+
 		return null;
 	}
 

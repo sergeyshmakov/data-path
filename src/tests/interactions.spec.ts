@@ -154,6 +154,28 @@ describe("Path interactions", () => {
 			expect(concrete.match(tmpl)?.relation).toBe("covered-by");
 		});
 
+		it("template-prefix vs deeper concrete: .match() agrees with .covers() (returns 'covers')", () => {
+			// Regression for codex-bot P2: covers() was true but match() returned
+			// null because patternMatches only handled whole-path matches and the
+			// literal parent/child branch was gated off when wildcards were
+			// present. Now match() and covers() agree on wildcard prefix coverage.
+			const tmplPrefix = path((r: R) => r.items).each();
+			const deeper = path((r: R) => r.items[0].name);
+			expect(tmplPrefix.covers(deeper)).toBe(true);
+			expect(tmplPrefix.match(deeper)?.relation).toBe("covers");
+			expect(deeper.match(tmplPrefix)?.relation).toBe("covered-by");
+		});
+
+		it("deep template-prefix vs deeper concrete returns 'covers' (with ** flexing)", () => {
+			interface Tree {
+				root: { kids: Array<{ value: string }> };
+			}
+			const tmplPrefix = path((r: Tree) => r.root).deep();
+			const deeper = path((r: Tree) => r.root.kids[0].value);
+			expect(tmplPrefix.covers(deeper)).toBe(true);
+			expect(tmplPrefix.match(deeper)?.relation).toBe("covers");
+		});
+
 		it("immutability: does not mutate original path", () => {
 			const concrete = path((p: R) => p.items[0].name);
 			const template = path((p: R) => p.items).each(
@@ -228,6 +250,37 @@ describe("Path interactions", () => {
 			const deep = path((p: Data) => p.a).deep((n) => n.b.c);
 			const concrete = path((p: Data) => p.a.b.c);
 			expect(deep.covers(concrete)).toBe(true);
+		});
+
+		it("(*) does NOT cover (**) — single-segment pattern can't absorb a deep wildcard", () => {
+			// Pre-fix bug: in matchesPrefix, prefix.WILDCARD short-circuited the
+			// equality check against full.DEEP_WILDCARD, so `*` was reported as
+			// covering `**`. Semantically `**` includes paths of depths != 1.
+			const single = path().each();
+			const deep = path().deep();
+			expect(single.covers(deep)).toBe(false);
+			expect(deep.covers(single)).toBe(true); // control: ** does cover *
+			// match() agrees: deep still covers single in the reverse direction.
+			expect(single.match(deep)?.relation).toBe("covered-by");
+			expect(deep.match(single)?.relation).toBe("covers");
+		});
+
+		it("(a.*.x) does NOT cover (a.**.x) — generalized * vs ** mismatch", () => {
+			// `a.**.x` includes paths of length >= 2 ending in `x`; `a.*.x` is
+			// length-3 only, so it can't cover the deeper-tail case.
+			interface Leaf {
+				x: string;
+			}
+			interface Two {
+				a: Record<string, Leaf>;
+			}
+			const star = path((p: Two) => p.a).each((child: Leaf) => child.x);
+			interface DeepShape {
+				a: { [k: string]: { x: string } | DeepShape };
+			}
+			const deep = path((p: DeepShape) => p.a).deep<string>((n: any) => n.x);
+			expect(star.covers(deep)).toBe(false);
+			expect(deep.covers(star)).toBe(true);
 		});
 	});
 

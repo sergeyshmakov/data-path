@@ -78,6 +78,11 @@ export function matchesPrefix(
 			return false;
 		}
 		if (f >= full.length) return false;
+		// `**` on `full`'s side stands for 0..N segments; a single-segment
+		// element in `prefix` (literal or `*`) can't absorb it. Without this
+		// guard, `prefix.WILDCARD` short-circuits the next check and silently
+		// treats `**` as one segment.
+		if (full[f] === DEEP_WILDCARD && prefix[p] !== DEEP_WILDCARD) return false;
 		if (prefix[p] !== WILDCARD && prefix[p] !== full[f]) return false;
 		p++;
 		f++;
@@ -86,47 +91,12 @@ export function matchesPrefix(
 }
 
 /**
- * Returns `true` iff `pattern` matches `concrete` exactly when wildcards
- * are expanded:
- *   - `WILDCARD` (`*`) consumes exactly one segment.
- *   - `DEEP_WILDCARD` (`**`) consumes zero or more segments.
- *   - all other segments must be `===` to the corresponding concrete segment.
- *
- * Lengths need not match: a single `**` lets the pattern collapse to a
- * shorter concrete or stretch to a longer one. This is the "covers"
- * relation used by `.match()` and is broader than `matchesPrefix`, which
- * only requires the pattern to match a leading slice.
+ * Returns `true` iff `segments` contains a wildcard sentinel
+ * (`WILDCARD` or `DEEP_WILDCARD`).
  */
-export function patternMatches(
-	pattern: readonly Segment[],
-	concrete: readonly Segment[],
-): boolean {
-	function walk(pi: number, ci: number): boolean {
-		if (pi === pattern.length) return ci === concrete.length;
-		const seg = pattern[pi];
-		if (seg === DEEP_WILDCARD) {
-			for (let skip = 0; ci + skip <= concrete.length; skip++) {
-				if (walk(pi + 1, ci + skip)) return true;
-			}
-			return false;
-		}
-		if (ci === concrete.length) return false;
-		if (seg === WILDCARD) return walk(pi + 1, ci + 1);
-		if (seg !== concrete[ci]) return false;
-		return walk(pi + 1, ci + 1);
-	}
-	return walk(0, 0);
-}
-
-function hasWildcardSegment(segments: readonly Segment[]): boolean {
+export function hasWildcardSegment(segments: readonly Segment[]): boolean {
 	for (const s of segments) {
 		if (s === WILDCARD || s === DEEP_WILDCARD) return true;
 	}
 	return false;
 }
-
-/**
- * Returns `true` iff `segments` contains a wildcard sentinel
- * (`WILDCARD` or `DEEP_WILDCARD`).
- */
-export { hasWildcardSegment };
