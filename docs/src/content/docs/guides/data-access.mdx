@@ -74,7 +74,7 @@ const incremented = scorePath.update(game, (n) => (n ?? 0) + 1);
 
 The updater receives `V | undefined` — handle the `undefined` case explicitly when the value might be absent.
 
-On a plain `Path`, this is equivalent to `path.set(data, updater(path.get(data)))`. On a `TemplatePath` the equivalence does **not** hold: `.update` invokes the updater **once per matched item** with that item's value, then writes each result back to its own location. See [Templates](/data-path/guides/templates/) for the per-item form, or use `.set(data, constant)` if you want to broadcast a single value across every match.
+On a plain `Path`, this is equivalent to `path.set(data, updater(path.get(data)))`. On a `TemplatePath` the equivalence does **not** hold: `.update` invokes the updater **once per matched item** with that item's value, then writes each result back to its own location. See [Templates](/guides/templates/) for the per-item form, or use `.set(data, constant)` if you want to broadcast a single value across every match.
 
 ## fn
 
@@ -102,6 +102,6 @@ namePath.length    // 2
 
 ## See also
 
-- [Templates](/data-path/guides/templates/) — bulk reads and writes across collections
-- [Path Algebra](/data-path/guides/path-algebra/) — compose and decompose paths
-- [Runtime Variables](/data-path/guides/runtime-variables/) — indices and closures inside lambdas
+- [Templates](/guides/templates/) — bulk reads and writes across collections
+- [Path Algebra](/guides/path-algebra/) — compose and decompose paths
+- [Runtime Variables](/guides/runtime-variables/) — indices and closures inside lambdas

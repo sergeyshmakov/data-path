@@ -4,8 +4,8 @@ import { defineConfig } from "astro/config";
 const REPO_URL = "https://github.com/sergeyshmakov/data-path";
 
 export default defineConfig({
-	site: "https://sergeyshmakov.github.io",
-	base: "/data-path",
+	site: "https://path.shmakov.tools",
+	base: "",
 	integrations: [
 		starlight({
 			title: "data-path",
