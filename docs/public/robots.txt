@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://sergeyshmakov.github.io/data-path/sitemap-index.xml
+Sitemap: https://path.shmakov.tools/sitemap-index.xml

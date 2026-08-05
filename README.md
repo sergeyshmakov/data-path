@@ -8,7 +8,7 @@ Type-safe object property paths in TypeScript — build, compare, and manipulate
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178c6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Documentation:** https://sergeyshmakov.github.io/data-path/
+**Documentation:** https://path.shmakov.tools/
 
 ---
 
@@ -65,20 +65,20 @@ firstNamePath.fn                       // stable (u: User) => string | undefined
 
 | Package | How it helps |
 |---------|--------------|
-| [React Hook Form](https://sergeyshmakov.github.io/data-path/integrations/react-hook-form/) | Type-safe field names for `register`, `watch`, `setValue` |
-| [TanStack Form](https://sergeyshmakov.github.io/data-path/integrations/tanstack-form/) | Typed field names with runtime index support |
-| [TanStack Table](https://sergeyshmakov.github.io/data-path/integrations/tanstack-table/) | Typed column accessors — no manual `id` strings |
-| [Zustand](https://sergeyshmakov.github.io/data-path/integrations/zustand/) | Immutable nested state updates without Immer |
-| [Zod](https://sergeyshmakov.github.io/data-path/integrations/zod/) | Map `ZodError.issues` paths to specific form fields |
-| [React `useState`](https://sergeyshmakov.github.io/data-path/integrations/react-usestate/) | Structural clones for deeply nested state |
+| [React Hook Form](https://path.shmakov.tools/integrations/react-hook-form/) | Type-safe field names for `register`, `watch`, `setValue` |
+| [TanStack Form](https://path.shmakov.tools/integrations/tanstack-form/) | Typed field names with runtime index support |
+| [TanStack Table](https://path.shmakov.tools/integrations/tanstack-table/) | Typed column accessors — no manual `id` strings |
+| [Zustand](https://path.shmakov.tools/integrations/zustand/) | Immutable nested state updates without Immer |
+| [Zod](https://path.shmakov.tools/integrations/zod/) | Map `ZodError.issues` paths to specific form fields |
+| [React `useState`](https://path.shmakov.tools/integrations/react-usestate/) | Structural clones for deeply nested state |
 
 ## Guides
 
-- [Data access](https://sergeyshmakov.github.io/data-path/guides/data-access/) — `get`, `set`, `update`, `fn`
-- [Templates](https://sergeyshmakov.github.io/data-path/guides/templates/) — `each`, `deep`, bulk writes across collections
-- [Path algebra](https://sergeyshmakov.github.io/data-path/guides/path-algebra/) — `merge`, `subtract`, `slice`, `to`
-- [Relational](https://sergeyshmakov.github.io/data-path/guides/relational/) — `startsWith`, `covers`, `match`
-- [Runtime variables](https://sergeyshmakov.github.io/data-path/guides/runtime-variables/) — dynamic indices and closures
+- [Data access](https://path.shmakov.tools/guides/data-access/) — `get`, `set`, `update`, `fn`
+- [Templates](https://path.shmakov.tools/guides/templates/) — `each`, `deep`, bulk writes across collections
+- [Path algebra](https://path.shmakov.tools/guides/path-algebra/) — `merge`, `subtract`, `slice`, `to`
+- [Relational](https://path.shmakov.tools/guides/relational/) — `startsWith`, `covers`, `match`
+- [Runtime variables](https://path.shmakov.tools/guides/runtime-variables/) — dynamic indices and closures
 
 ## AI tooling
 
