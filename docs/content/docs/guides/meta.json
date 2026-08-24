@@ -1,0 +1,10 @@
+{
+	"title": "Guides",
+	"pages": [
+		"data-access",
+		"templates",
+		"path-algebra",
+		"relational",
+		"runtime-variables"
+	]
+}

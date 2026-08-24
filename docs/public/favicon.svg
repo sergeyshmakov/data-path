@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="data-path">
+  <!--
+    The same three bars as logo.svg, at the same geometry. Kept as its own file
+    because `app/layout.tsx` links it separately and browsers cache a favicon
+    apart from page assets; kept identical because a tab icon that differs from
+    the nav mark is two marks.
+
+    Bars are what survive 16px. The mark this replaced was three dots joined by
+    right-angled strokes, which at tab size was a smudge.
+  -->
+  <rect x="3" y="3" width="26" height="7" rx="3.5" fill="#a1a1aa" />
+  <rect x="9" y="13" width="20" height="7" rx="3.5" fill="#71717a" />
+  <rect x="15" y="23" width="14" height="7" rx="3.5" fill="#eab308" />
+</svg>

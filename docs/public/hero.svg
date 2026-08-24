@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 440" width="440" height="440" fill="none" role="img" aria-label="Abstract indent cascade: at each level one bar is selected and the next level is indented beneath it">
+	<title>An object path, level by level</title>
+
+	<!--
+		The logo's own grammar at hero scale. Each row is one level of an object:
+		several keys sit side by side, exactly one of them is on the path, and the
+		next row starts where that one started. So the left edge is a descending
+		staircase and the right edge is flush — the shape of a path narrowing
+		through a structure, with nothing figurative in it to date.
+
+		Weight increases down the chain so the eye travels to the accent bar, which
+		is the value the path resolves to. The unselected keys are all at one
+		opacity, on purpose: varying them would read as a second signal.
+
+		No wash behind it. A radial fade inside a bounding box shows its own edges
+		unless it completes before them, and it would fight the 32px grid the hero
+		section already lays down.
+	-->
+
+	<!-- the keys not on the path, one weight throughout -->
+	<g fill="#71717a" opacity=".14">
+		<rect x="206" y="76" width="76" height="34" rx="12" />
+		<rect x="296" y="76" width="84" height="34" rx="12" />
+		<rect x="232" y="138" width="64" height="34" rx="12" />
+		<rect x="310" y="138" width="70" height="34" rx="12" />
+		<rect x="258" y="200" width="52" height="34" rx="12" />
+		<rect x="324" y="200" width="56" height="34" rx="12" />
+		<rect x="286" y="262" width="94" height="34" rx="12" />
+		<rect x="330" y="324" width="50" height="34" rx="12" />
+	</g>
+
+	<!-- the path itself: one key per level, each indented under the last -->
+	<g fill="#71717a">
+		<rect x="60" y="76" width="132" height="34" rx="12" opacity=".32" />
+		<rect x="100" y="138" width="118" height="34" rx="12" opacity=".45" />
+		<rect x="140" y="200" width="104" height="34" rx="12" opacity=".58" />
+		<rect x="180" y="262" width="92" height="34" rx="12" opacity=".74" />
+	</g>
+
+	<!-- the value it resolves to -->
+	<rect x="220" y="324" width="96" height="34" rx="12" fill="#eab308" />
+</svg>
