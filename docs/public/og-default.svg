@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" fill="none">
+	<title>data-path — Typed Object Paths for TypeScript</title>
+
+	<!--
+		Source for public/og-default.png. Crawlers do not render SVG, so the PNG is
+		what ships — see scripts/render-png.mjs. Keeping the source here means the
+		card can be edited as text rather than in an image editor, and stays in step
+		with the logo and hero it shares a motif with.
+
+		Light ground, matching the near-white docs, with the accent on the foot rule
+		and the resolved bar. The structural hue is a step darker here than in
+		logo.svg and hero.svg: this card only ever sits on a light background, and
+		zinc-500 at low opacity on white is not a colour so much as an absence.
+
+		Text uses a system stack because the rasteriser has no webfont — every
+		fallback listed is present on the CI runner.
+	-->
+	<defs>
+		<linearGradient id="og-ground" x1="0" y1="0" x2="1" y2="1">
+			<stop offset="0" stop-color="#ffffff" />
+			<stop offset="1" stop-color="#fdf9ec" />
+		</linearGradient>
+	</defs>
+
+	<rect width="1200" height="630" fill="url(#og-ground)" />
+
+	<!-- A rule at the foot, so the card reads as a card on a white timeline
+	     rather than bleeding into it. -->
+	<rect y="624" width="1200" height="6" fill="#eab308" />
+
+	<!-- left column: identity, headline, credentials -->
+
+	<!-- the mark, byte-for-byte logo.svg's geometry and colours, scaled to 56px -->
+	<g transform="translate(80 76) scale(1.75)">
+		<rect x="3" y="3" width="26" height="7" rx="3.5" fill="#a1a1aa" />
+		<rect x="9" y="13" width="20" height="7" rx="3.5" fill="#71717a" />
+		<rect x="15" y="23" width="14" height="7" rx="3.5" fill="#eab308" />
+	</g>
+
+	<text x="152" y="118" font-family="Segoe UI, Arial, Helvetica, sans-serif"
+	      font-size="34" font-weight="600" fill="#1c1917" letter-spacing="-.5">data-path</text>
+
+	<text font-family="Segoe UI, Arial, Helvetica, sans-serif" font-size="66"
+	      font-weight="700" fill="#1c1917" letter-spacing="-2.2">
+		<tspan x="80" y="286">Typed Object Paths</tspan>
+		<tspan x="80" y="356">for TypeScript</tspan>
+	</text>
+
+	<text x="80" y="434" font-family="Segoe UI, Arial, Helvetica, sans-serif"
+	      font-size="27" font-weight="400" fill="#57534e">Build paths from lambdas. Use them as strings,</text>
+	<text x="80" y="472" font-family="Segoe UI, Arial, Helvetica, sans-serif"
+	      font-size="27" font-weight="400" fill="#57534e">accessors, or composable algebra.</text>
+
+	<!-- credentials, separated by rules rather than bullets so they read as
+	     distinct facts rather than a list. Rules sit ~20px clear of the text on
+	     either side, measured against the rendered widths rather than guessed. -->
+	<g font-family="Segoe UI, Arial, Helvetica, sans-serif" font-size="22" font-weight="600" fill="#a16207">
+		<text x="80" y="552">TypeScript</text>
+		<text x="245" y="552">Zero dependencies</text>
+		<text x="497" y="552">MIT</text>
+	</g>
+	<g fill="#e2d9b8">
+		<rect x="225" y="534" width="2" height="22" />
+		<rect x="477" y="534" width="2" height="22" />
+	</g>
+
+	<!-- right column: the cascade from the hero, hue resolved for a light ground -->
+	<g transform="translate(720 140) scale(1.25)">
+		<g fill="#52525b" opacity=".13">
+			<rect x="146" y="0" width="76" height="34" rx="12" />
+			<rect x="236" y="0" width="84" height="34" rx="12" />
+			<rect x="172" y="62" width="64" height="34" rx="12" />
+			<rect x="250" y="62" width="70" height="34" rx="12" />
+			<rect x="198" y="124" width="52" height="34" rx="12" />
+			<rect x="264" y="124" width="56" height="34" rx="12" />
+			<rect x="226" y="186" width="94" height="34" rx="12" />
+			<rect x="270" y="248" width="50" height="34" rx="12" />
+		</g>
+		<g fill="#52525b">
+			<rect x="0" y="0" width="132" height="34" rx="12" opacity=".3" />
+			<rect x="40" y="62" width="118" height="34" rx="12" opacity=".43" />
+			<rect x="80" y="124" width="104" height="34" rx="12" opacity=".57" />
+			<rect x="120" y="186" width="92" height="34" rx="12" opacity=".73" />
+		</g>
+		<rect x="160" y="248" width="96" height="34" rx="12" fill="#eab308" />
+	</g>
+</svg>

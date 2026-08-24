@@ -1,0 +1,116 @@
+---
+title: Zod
+description: Map ZodError.issues paths to typed field paths for form error display.
+---
+
+When a Zod schema fails validation, `ZodError.issues` contains an array of error objects. Each issue has a `path` property — an array of string and number segments (e.g. `["user", "age"]`). Mapping those segments to specific form fields requires comparing them to known field paths. `data-path` makes that comparison typed and refactor-safe.
+
+<Callout type="info">
+Don't round-trip Zod segments through `join(".")` + `unsafePath()`. A schema key that contains a literal `.` (e.g. `z.object({ "user.email": ... })`) gets split by `unsafePath` and resolves to the wrong path. Pass the segments array directly — every method that takes a path also accepts `{ segments }`.
+</Callout>
+
+## Basic mapping
+
+```ts
+import { z } from "zod";
+import { path } from "data-path";
+
+const schema = z.object({
+  user: z.object({
+    age: z.number().min(18, "Must be at least 18"),
+    email: z.string().email("Invalid email"),
+  }),
+});
+
+type FormData = z.infer<typeof schema>;
+
+const agePath = path((f: FormData) => f.user.age);
+const emailPath = path((f: FormData) => f.user.email);
+
+const result = schema.safeParse({ user: { age: 15, email: "bad" } });
+
+if (!result.success) {
+  for (const issue of result.error.issues) {
+    // Compare the Zod segments array directly — no string round-trip.
+    if (agePath.equals({ segments: issue.path })) {
+      console.log("Age error:", issue.message);
+    }
+    if (emailPath.equals({ segments: issue.path })) {
+      console.log("Email error:", issue.message);
+    }
+  }
+}
+```
+
+## Building a field error map
+
+A `Map` keyed by stringified segments avoids the dot-collision hazard of `path.join(".")`:
+
+```ts
+function buildErrorMap(error: z.ZodError): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const issue of error.issues) {
+    // JSON.stringify preserves segment boundaries even when a key contains '.'
+    map.set(JSON.stringify(issue.path), issue.message);
+  }
+  return map;
+}
+
+const errors = buildErrorMap(result.error);
+
+// Look up by typed path
+const ageError = errors.get(JSON.stringify(agePath.segments));     // "Must be at least 18"
+const emailError = errors.get(JSON.stringify(emailPath.segments)); // "Invalid email"
+```
+
+Using `agePath.segments` as the lookup key keeps the field reference in sync with the schema: if you rename `age` to `birthYear`, the path lambda breaks at compile time, and `agePath.segments` updates automatically.
+
+## React Hook Form integration
+
+The same pattern applies when using Zod as a resolver with React Hook Form:
+
+```tsx
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { path } from "data-path";
+
+const agePath = path((f: FormData) => f.user.age);
+
+function AgeForm() {
+  const {
+    register,
+    formState: { errors },
+  } = useForm<FormData>({ resolver: zodResolver(schema) });
+
+  // errors object is keyed by field name strings
+  const ageError = agePath.segments.reduce(
+    (obj: Record<string, unknown>, seg) =>
+      obj?.[seg] as Record<string, unknown>,
+    errors as Record<string, unknown>,
+  ) as { message?: string } | undefined;
+
+  return (
+    <form>
+      <input {...register(agePath.$)} />
+      {ageError?.message && <span>{ageError.message}</span>}
+    </form>
+  );
+}
+```
+
+## Nested and array paths
+
+Zod emits numeric indices as real numbers in `issue.path` (e.g. `["users", 0, "email"]`). `data-path` uses the same `string | number` segment convention, so the array matches directly — no string conversion required:
+
+```ts
+const firstUserEmailPath = path((f: FormData) => f.users[0].email);
+
+// Zod issue: { path: ["users", 0, "email"], message: "..." }
+firstUserEmailPath.equals({ segments: issue.path });  // true
+```
+
+## See also
+
+- [Data access](/guides/data-access/) — `unsafePath` for string-to-path conversion
+- [Relational](/guides/relational/) — `equals`, `startsWith`, `match`
+- [React Hook Form](/integrations/react-hook-form/) — typed field registration
