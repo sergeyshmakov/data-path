@@ -1,0 +1,131 @@
+---
+title: Templates
+description: Bulk reads and writes across arrays and recursive trees using each and deep.
+---
+
+A template path contains one or more wildcards (`*` or `**`). It targets multiple values at once rather than a single leaf. Template paths are created with `.each()` and `.deep()`.
+
+<Callout type="info">
+**Wildcards are sentinel symbols, not the strings `"*"`/`"**"`**
+
+The wildcards inserted by `.each()` and `.deep()` are unique `Symbol` values exported as `WILDCARD` / `DEEP_WILDCARD`. They render as `"*"` / `"**"` in `.toString()` and `.$` for dot-notation compatibility, but they are NOT the same as the literal strings `"*"` and `"**"`.
+
+This matters when your data has a real property named `"*"` (or `"**"`):
+
+```ts
+import { path, unsafePath } from "data-path";
+
+// Literal "*" key — no wildcard semantics:
+unsafePath<{ "*": number }>("*").get({ "*": 1, "**": 2 });   // 1
+
+// Wildcard sentinel — expands to every key:
+path<Record<string, number>>().each().get({ "*": 1, "**": 2 });  // [1, 2]
+```
+
+In short: **the only way to get wildcard expansion is `.each()` / `.deep()`** on a path or template. `unsafePath("a.*.b")`, `{ segments: ["*"] }`, and `(x) => x["*"]` are always literal-key lookups.
+</Callout>
+
+## each — single-level wildcard
+
+`.each()` appends a `*` wildcard that matches every key of the current collection.
+
+```ts
+import { path } from "data-path";
+
+type AppData = { users: Array<{ name: string; active: boolean }> };
+
+const allUsersPath = path((d: AppData) => d.users).each();
+allUsersPath.$  // "users.*"
+
+const allNamesPath = path((d: AppData) => d.users).each((u) => u.name);
+allNamesPath.$  // "users.*.name"
+```
+
+The optional expression argument navigates from each matched item. Without it, `.each()` targets the items themselves.
+
+## deep — recursive wildcard
+
+`.deep()` appends a `**` wildcard that matches the current value and all descendants recursively.
+
+```ts
+type Tree = { label: string; children?: Tree[] };
+
+const allLabelsPath = path((t: Tree) => t).deep((n) => n.label);
+allLabelsPath.$  // "**.label"
+```
+
+`**` tries to match the rest of the pattern at the current depth first, then recurses into every child.
+
+## get — bulk read
+
+On a template path, `.get()` returns `V[]` (an array of all matched values):
+
+```ts
+const data: AppData = {
+  users: [{ name: "Alice", active: true }, { name: "Bob", active: false }],
+};
+
+allNamesPath.get(data)  // ["Alice", "Bob"]
+```
+
+## set — bulk write
+
+`.set(data, value)` applies the same value to every matched path:
+
+```ts
+const anonymized = allNamesPath.set(data, "Hidden");
+anonymized.users[0].name  // "Hidden"
+anonymized.users[1].name  // "Hidden"
+data.users[0].name        // "Alice" — original unchanged
+```
+
+## update — per-item transform
+
+`.update(data, fn)` calls the updater once per matched path, with the current value at that path:
+
+```ts
+const uppercased = allNamesPath.update(data, (name) => (name ?? "").toUpperCase());
+uppercased.users[0].name  // "ALICE"
+uppercased.users[1].name  // "BOB"
+```
+
+Each update is applied to the result of the previous one — later paths see the changes from earlier paths.
+
+## expand — resolve to concrete paths
+
+`.expand(data)` walks the data and returns one `Path<T, V>` per matched leaf:
+
+```ts
+const paths = allNamesPath.expand(data);
+paths[0].$  // "users.0.name"
+paths[1].$  // "users.1.name"
+```
+
+`expand` only visits keys that exist in the data. Missing intermediates are skipped, so `.expand()` on sparse data returns fewer paths than the structure implies.
+
+## Chaining wildcards
+
+Multiple `.each()` and `.deep()` calls compose naturally:
+
+```ts
+type Org = { teams: Array<{ members: Array<{ email: string }> }> };
+
+const allEmailsPath = path((o: Org) => o.teams)
+  .each((t) => t.members)
+  .each((m) => m.email);
+
+allEmailsPath.$  // "teams.*.members.*.email"
+```
+
+## fn on template paths
+
+`.fn` on a template path returns `(data: T) => V[]`, suitable for `.map()`:
+
+```ts
+const allNames = teamList.map(allNamesPath.fn);  // string[][]
+```
+
+## See also
+
+- [Data access](/guides/data-access/) — `get`, `set`, `update` on concrete paths
+- [Runtime Variables](/guides/runtime-variables/) — dynamic indices as an alternative to wildcards

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="data-path">
+  <!--
+    Three bars, each indented one step further and narrowing as it goes, the last
+    one carrying the accent. That is a path: every key narrows the scope, and the
+    last one resolves to a value.
+
+    Explicit colours rather than `currentColor`, deliberately. This file is
+    referenced as `<img src="/logo.svg">`, which renders in its own document where
+    `currentColor` resolves to black — so the mark this replaced disappeared into
+    the nav on the dark theme.
+
+    Solid fills rather than one hue at three opacities, also deliberately. Alpha
+    over an unknown ground is unpredictable, and a 24px bar that has gone 50%
+    transparent is a smudge. Zinc-400 and zinc-500 both clear 2:1 on the light
+    ground and on the dark one, so no bar drops out on either theme.
+  -->
+  <rect x="3" y="3" width="26" height="7" rx="3.5" fill="#a1a1aa" />
+  <rect x="9" y="13" width="20" height="7" rx="3.5" fill="#71717a" />
+  <rect x="15" y="23" width="14" height="7" rx="3.5" fill="#eab308" />
+</svg>
